@@ -137,6 +137,8 @@ h1 em, h2 em { color: var(--aqua); font-weight: 500; }
   letter-spacing: -.06em; transition: transform .2s ease, box-shadow .2s ease;
 }
 .app-symbol[href]:hover { transform: translateY(-3px) rotate(-2deg); box-shadow: 0 19px 40px rgba(0,0,0,.22); }
+.app-symbol.has-image { padding: 6px; overflow: hidden; }
+.app-symbol.has-image img { width: 100%; height: 100%; object-fit: contain; }
 .app-two .app-symbol { color: #8a5b00; background: #fff4cf; }
 .app-three .app-symbol { color: #863f34; background: #ffe5df; }
 .app-four .app-symbol { color: var(--ocean); background: #e3fbf7; }
@@ -165,6 +167,8 @@ h1 em, h2 em { color: var(--aqua); font-weight: 500; }
 .detail-hero::after { content: ""; position: absolute; width: 520px; height: 520px; right: -130px; top: -245px; border-radius: 50%; background: var(--detail-accent, var(--aqua)); opacity: .18; }
 .detail-hero-grid { position: relative; z-index: 1; display: grid; grid-template-columns: 130px 1fr; align-items: center; gap: 48px; }
 .detail-app-icon { display: grid; place-items: center; width: 130px; height: 130px; border-radius: 38px; color: var(--deep); background: var(--detail-icon, #f8ffff); box-shadow: 0 25px 55px rgba(0,0,0,.24); font-size: 38px; font-weight: 900; letter-spacing: -.06em; transform: rotate(-3deg); }
+.detail-app-icon.has-image { padding: 10px; overflow: hidden; }
+.detail-app-icon.has-image img { width: 100%; height: 100%; object-fit: contain; }
 .detail-kicker { margin: 0 0 13px; color: #83dcd5; font-size: 11px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
 .detail-hero h1 { margin: 0; font: 500 clamp(50px, 7vw, 88px)/.95 Georgia, serif; letter-spacing: -.045em; }
 .detail-lead { max-width: 720px; margin: 23px 0 0; color: #b8cfd4; font-size: 19px; line-height: 1.7; }
