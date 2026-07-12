@@ -194,6 +194,7 @@ h1 em, h2 em { color: var(--aqua); font-weight: 500; }
 .allin1-detail { --detail-accent: var(--aqua); --detail-icon: #f8ffff; }
 .foculume-detail { --detail-accent: var(--sun); --detail-icon: #fff3c9; }
 .macro-detail { --detail-accent: var(--coral); --detail-icon: #ffe5df; }
+.pixevra-detail { --detail-accent: #7357ff; --detail-icon: #eef3ff; }
 
 .contact-section { background: var(--sand); }
 .contact-card { display: grid; grid-template-columns: 1.2fr .7fr auto; align-items: center; gap: 55px; padding: 65px; border-radius: 34px; background: rgba(255,255,255,.72); box-shadow: 0 18px 50px rgba(126,87,30,.08); }
