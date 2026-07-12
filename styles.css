@@ -97,15 +97,8 @@ h1 em, h2 em { color: var(--aqua); font-weight: 500; }
 .wave-front { top: 58px; background: linear-gradient(90deg, var(--ocean), #0497b8 50%, var(--aqua)); transform: rotate(1deg); }
 
 .section { padding: 120px 0; }
-.about-section { background: #fffdfa; }
-.about-grid { display: grid; grid-template-columns: .88fr 1.12fr; gap: 100px; }
-.section-heading h2, .apps-heading h2, .contact-card h2 { font-size: clamp(44px, 5vw, 70px); }
-.about-copy > p { max-width: 600px; margin: 5px 0 50px; color: var(--muted); font-size: 20px; line-height: 1.65; }
-.values { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
-.values article { padding-top: 20px; border-top: 1px solid #dbe7e5; }
-.values article > span, .card-label { color: var(--aqua); font-size: 11px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
-.values h3 { margin: 20px 0 8px; font-size: 19px; }
-.values p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
+.apps-heading h2, .contact-card h2 { font-size: clamp(44px, 5vw, 70px); }
+.card-label { color: var(--aqua); font-size: 11px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
 
 .apps-section { position: relative; overflow: hidden; color: white; background: var(--deep); }
 .apps-section::after { content: ""; position: absolute; width: 500px; height: 500px; right: -150px; bottom: -240px; border: 1px solid rgba(255,255,255,.1); border-radius: 50%; box-shadow: 0 0 0 70px rgba(255,255,255,.025), 0 0 0 140px rgba(255,255,255,.02); }
@@ -238,7 +231,7 @@ h1 em, h2 em { color: var(--aqua); font-weight: 500; }
   .hero-text { margin-inline: auto; }
   .hero-art { min-height: 430px; }
   .logo-card { width: 410px; }
-  .about-grid, .apps-heading { grid-template-columns: 1fr; gap: 40px; }
+  .apps-heading { grid-template-columns: 1fr; gap: 40px; }
   .app-grid { grid-template-columns: 1fr; }
   .contact-card { grid-template-columns: 1fr; gap: 24px; text-align: center; }
   .contact-card .eyebrow { justify-content: center; }
@@ -259,7 +252,6 @@ h1 em, h2 em { color: var(--aqua); font-weight: 500; }
   .pill-one { right: 0; }
   .pill-two { left: 0; }
   .section { padding: 85px 0; }
-  .values { grid-template-columns: 1fr; }
   .app-card { min-height: 390px; padding: 26px; }
   .app-symbol { width: 62px; height: 62px; flex-basis: 62px; border-radius: 18px; }
   .app-meta { flex-direction: column; align-items: flex-end; gap: 4px; }
