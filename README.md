@@ -1,6 +1,6 @@
-# LuaEstrelaApps
+# EstrelaLuaApps
 
-A responsive, dependency-free landing page for LuaEstrelaApps. It can be hosted directly with GitHub Pages.
+A responsive, dependency-free landing page for EstrelaLuaApps. It can be hosted directly with GitHub Pages.
 
 ## Preview locally
 
