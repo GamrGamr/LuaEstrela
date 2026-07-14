@@ -28,6 +28,10 @@ A portable macro recorder and player for capturing keyboard events and mouse cli
 
 A local image utility for converting, resizing, cropping, trimming, creating ICO files, and cleaning up image backgrounds without uploading files anywhere.
 
+### Halvynox
+
+A lightweight Windows shutdown scheduler with countdown warnings, limited delay attempts, optional password protection, and local configuration.
+
 ## About the project
 
 EstrelaLuaApps is created and maintained by one independent developer. The applications focus on useful everyday tools, straightforward interfaces, local data storage, and avoiding unnecessary accounts, cloud services, and telemetry.
