@@ -1,5 +1,5 @@
-import { ValidationError, calculateFillUpConsumption, calculateJourney, formatCurrency, parseNumber } from "./calculations.js?v=5";
-import { CalculatorStorage } from "./storage.js?v=5";
+import { ValidationError, calculateFillUpConsumption, calculateJourney, formatCurrency, formatDurationInput, parseDuration, parseNumber } from "./calculations.js?v=6";
+import { CalculatorStorage } from "./storage.js?v=6";
 
 const results = [];
 const base = { oneWayDistance: 100, tripMultiplier: 1, passengerCount: 1, energyType: "petrol", fuelConsumption: 6, fuelPrice: 2, currency: "EUR" };
@@ -21,7 +21,12 @@ await test("One-way journey", () => close(calculateJourney(base).totalDistance, 
 await test("Return journey", () => close(calculateJourney({ ...base, tripMultiplier: 2 }).totalDistance, 200));
 await test("Separate outbound and return tolls", () => { const result = calculateJourney({ ...base, outboundToll: 10, returnToll: 12 }); close(result.totalTolls, 22); });
 await test("Custom multiplier", () => close(calculateJourney({ ...base, tripMultiplier: 1.5 }).totalDistance, 150));
-await test("Additional kilometres", () => close(calculateJourney({ ...base, additionalKilometres: 25 }).totalDistance, 125));
+await test("Duration in 00h00 format", () => close(parseDuration("01h30"), 5400));
+await test("Single-digit hours accepted", () => close(parseDuration("1h05"), 3900));
+await test("Zero duration accepted", () => close(parseDuration("00h00"), 0));
+await test("Saved duration formats for editing", () => assert(formatDurationInput(5400) === "01h30"));
+await test("Invalid duration minutes rejected", () => { let threw = false; try { parseDuration("01h60"); } catch { threw = true; } assert(threw); });
+await test("Plain duration minutes rejected", () => { let threw = false; try { parseDuration("90"); } catch { threw = true; } assert(threw); });
 await test("Parking and ferry", () => close(calculateJourney({ ...base, parkingCost: 8, ferryCost: 12 }).totalCost, 32));
 await test("Maintenance cost", () => close(calculateJourney({ ...base, maintenanceRate: .1 }).maintenanceCost, 10));
 await test("Multiple custom costs", () => close(calculateJourney({ ...base, customCosts: [{ name: "Fee", amount: 3 }, { name: "Permit", amount: 4 }] }).customCostTotal, 7));
@@ -78,7 +83,7 @@ await new Promise((resolve, reject) => {
     const database = request.result;
     const transaction = database.transaction(["vehicles", "journeys", "routeCache"], "readwrite");
     transaction.objectStore("vehicles").put({ id: "old-vehicle", name: "Existing car", tollCategory: "passenger-car", axleCount: 2 });
-    transaction.objectStore("journeys").put({ id: "old-journey", name: "Existing journey", origin: "Lisbon", destination: "Porto", stops: ["Coimbra"], provider: "Old service", routeSelection: { id: "route" }, input: { oneWayDistance: 10, tollSource: "Old service" } });
+    transaction.objectStore("journeys").put({ id: "old-journey", name: "Existing journey", origin: "Lisbon", destination: "Porto", stops: ["Coimbra"], provider: "Old service", routeSelection: { id: "route" }, input: { oneWayDistance: 10, additionalKilometres: 5, tollSource: "Old service" }, result: { totalDistance: 15, additionalKilometres: 5 } });
     transaction.objectStore("routeCache").put({ id: "old-route", value: 1 });
     transaction.oncomplete = () => { database.close(); resolve(); };
     transaction.onerror = () => reject(transaction.error);
@@ -90,7 +95,7 @@ await test("Online-route data is removed without losing saved records", async ()
   assert(!database.objectStoreNames.contains("routeCache"));
   const vehicle = await migrationStorage.get("vehicles", "old-vehicle");
   const journey = await migrationStorage.get("journeys", "old-journey");
-  assert(vehicle.name === "Existing car" && !("tollCategory" in vehicle) && journey.name === "Existing journey" && !("provider" in journey) && !("origin" in journey) && !("destination" in journey) && !("stops" in journey) && !("tollSource" in journey.input));
+  assert(vehicle.name === "Existing car" && !("tollCategory" in vehicle) && journey.name === "Existing journey" && !("provider" in journey) && !("origin" in journey) && !("destination" in journey) && !("stops" in journey) && !("tollSource" in journey.input) && !("additionalKilometres" in journey.input) && !("additionalKilometres" in journey.result));
 });
 await test("Relative calculator path works under /EstrelaLua/", () => { const target = new URL("../../apps/vehicle-cost-calculator.html", "https://gamrgamr.github.io/EstrelaLua/tools/vehicle-cost-calculator/index.html"); assert(target.pathname === "/EstrelaLua/apps/vehicle-cost-calculator.html"); });
 

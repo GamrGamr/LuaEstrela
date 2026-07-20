@@ -1,4 +1,4 @@
-const DATABASE_VERSION = 3;
+const DATABASE_VERSION = 4;
 export const DATABASE_NAME = "estrela-lua-vehicle-cost-calculator";
 export const BACKUP_VERSION = 1;
 export const STORE_NAMES = ["vehicles", "fillups", "journeys", "fuelPrices"];
@@ -12,7 +12,7 @@ function sanitiseRecord(storeName, record) {
   if (storeName === "journeys") {
     REMOVED_JOURNEY_FIELDS.forEach((field) => delete copy[field]);
     [copy.input, copy.result].filter(Boolean).forEach((details) => {
-      ["returnDistance", "tollStatus", "tollSource"].forEach((field) => delete details[field]);
+      ["returnDistance", "tollStatus", "tollSource", "additionalKilometres"].forEach((field) => delete details[field]);
     });
   }
   return copy;

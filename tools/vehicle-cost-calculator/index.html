@@ -8,7 +8,7 @@
     <title>Vehicle Cost Calculator &mdash; EstrelaLuaApps</title>
     <link rel="icon" href="../../assets/favicon-32.ico" sizes="32x32" />
     <link rel="stylesheet" href="calculator.css?v=5" />
-    <script type="module" src="calculator.js?v=6"></script>
+    <script type="module" src="calculator.js?v=7"></script>
   </head>
   <body>
     <a class="skip-link" href="#calculator-main">Skip to calculator</a>
@@ -55,10 +55,9 @@
             <div class="step-content">
               <fieldset>
                 <legend>Distance and duration</legend>
-                <div class="field-grid three-columns">
+                <div class="field-grid two-columns">
                   <div class="field"><label for="one-way-distance">One-way distance</label><div class="unit-input"><input id="one-way-distance" name="oneWayDistance" inputmode="decimal" autocomplete="off" required aria-required="true" /><span>km</span></div><p class="field-help">Enter a value greater than zero.</p></div>
-                  <div class="field"><label for="manual-duration">One-way duration <span class="optional">Optional</span></label><div class="unit-input"><input id="manual-duration" name="manualDuration" inputmode="decimal" autocomplete="off" /><span>min</span></div></div>
-                  <div class="field"><label for="additional-km">Additional distance</label><div class="unit-input"><input id="additional-km" name="additionalKilometres" inputmode="decimal" autocomplete="off" value="0" /><span>km</span></div></div>
+                  <div class="field"><label for="manual-duration">One-way duration <span class="optional">Optional</span></label><input id="manual-duration" name="manualDuration" inputmode="text" autocomplete="off" maxlength="7" placeholder="00h00" aria-describedby="duration-format" /><p id="duration-format" class="field-help">Use hours and minutes, for example 01h30.</p></div>
                 </div>
               </fieldset>
 

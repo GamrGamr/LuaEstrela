@@ -5,11 +5,13 @@ import {
   calculateJourney,
   formatCurrency,
   formatDuration,
+  formatDurationInput,
   formatNumber,
   makeId,
+  parseDuration,
   parseNumber,
-} from "./calculations.js?v=5";
-import { CalculatorStorage, StorageError } from "./storage.js?v=5";
+} from "./calculations.js?v=6";
+import { CalculatorStorage, StorageError } from "./storage.js?v=6";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -463,10 +465,11 @@ function readCustomCosts() {
 
 function rawJourneyValues() {
   const multiplier = value("trip-multiplier");
-  const durationSeconds = parseNumber(value("manual-duration"), { field: "Duration", fieldId: "manual-duration", max: 1_000_000 }) * 60 * parseNumber(multiplier || 1, { field: "Trip multiplier", fieldId: "trip-multiplier", min: .01, max: 1_000, required: true });
+  const parsedMultiplier = parseNumber(multiplier || 1, { field: "Trip multiplier", fieldId: "trip-multiplier", min: .01, max: 1_000, required: true });
+  const durationSeconds = parseDuration(value("manual-duration")) * parsedMultiplier;
   return {
     oneWayDistance: value("one-way-distance"),
-    tripMultiplier: multiplier, additionalKilometres: value("additional-km"), passengerCount: value("passenger-count"),
+    tripMultiplier: multiplier, passengerCount: value("passenger-count"),
     durationSeconds, energyType: value("energy-type"), fuelConsumption: value("fuel-consumption"),
     electricConsumption: value("electric-consumption"), fuelPrice: value("fuel-price"), electricityPrice: value("electricity-price"),
     outboundToll: value("outbound-toll"), returnToll: value("return-toll"), ferryCost: value("ferry-cost"),
@@ -569,8 +572,10 @@ function loadJourney(record, useCurrentVehicle = false) {
   const input = record.input || {};
   const journey = record;
   safeValue("journey-name", journey.name || ""); safeValue("journey-notes", journey.notes || "");
-  safeValue("one-way-distance", input.oneWayDistance ?? record.result?.oneWayDistance ?? ""); safeValue("additional-km", input.additionalKilometres ?? 0);
+  safeValue("one-way-distance", input.oneWayDistance ?? record.result?.oneWayDistance ?? "");
   safeValue("trip-multiplier", input.tripMultiplier ?? 1); safeValue("passenger-count", input.passengerCount ?? 1);
+  const loadedMultiplier = Number(input.tripMultiplier) || 1;
+  safeValue("manual-duration", formatDurationInput((input.durationSeconds ?? record.result?.durationSeconds ?? 0) / loadedMultiplier));
   const type = Number(input.tripMultiplier) === 2 ? "return" : Number(input.tripMultiplier) === 1 ? "one-way" : "custom";
   $(`input[name="journeyType"][value="${type}"]`).checked = true;
   safeValue("energy-type", input.energyType || "petrol"); safeValue("fuel-consumption", input.fuelConsumption || "");
@@ -637,7 +642,7 @@ function exportSummary() {
 function resetCalculator(force = false) {
   if (!force && state.currentResult && !confirm("Reset the current calculator form? Saved vehicles, fill-ups, and journeys will not be removed.")) return;
   $("#journey-form").reset();
-  safeValue("trip-multiplier", 1); safeValue("passenger-count", 1); safeValue("additional-km", 0); safeValue("maintenance-rate", 0);
+  safeValue("trip-multiplier", 1); safeValue("passenger-count", 1); safeValue("maintenance-rate", 0);
   safeValue("outbound-toll", 0); safeValue("return-toll", 0); safeValue("ferry-cost", 0); safeValue("parking-cost", 0);
   populateCustomCosts();
   state.currentResult = null; state.currentInput = null; state.currentJourneyId = null;

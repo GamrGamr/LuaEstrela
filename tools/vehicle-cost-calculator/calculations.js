@@ -49,14 +49,29 @@ export function parseNumber(value, { field = "Value", fieldId = "", min = 0, max
   return number;
 }
 
+export function parseDuration(value, { field = "Duration", fieldId = "manual-duration" } = {}) {
+  const text = String(value ?? "").trim().toLowerCase();
+  if (!text) return 0;
+  const match = text.match(/^(\d{1,4})h([0-5]\d)$/);
+  if (!match) throw new ValidationError(`${field} must use the format 01h30. Minutes must be between 00 and 59.`, field, fieldId);
+  return Number(match[1]) * 3600 + Number(match[2]) * 60;
+}
+
+export function formatDurationInput(seconds) {
+  const totalMinutes = Math.max(0, Math.round((Number(seconds) || 0) / 60));
+  if (!totalMinutes) return "";
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = Math.round(totalMinutes % 60);
+  return `${String(hours).padStart(2, "0")}h${String(minutes).padStart(2, "0")}`;
+}
+
 export function calculateJourney(input = {}) {
   const energyType = ENERGY_TYPES.includes(input.energyType) ? input.energyType : "petrol";
   const oneWayDistance = parseNumber(input.oneWayDistance, { field: "One-way distance", fieldId: "one-way-distance", min: 0.01, max: 1_000_000, required: true });
   const tripMultiplier = parseNumber(input.tripMultiplier ?? 1, { field: "Trip multiplier", fieldId: "trip-multiplier", min: 0.01, max: 1_000, required: true });
-  const additionalKilometres = parseNumber(input.additionalKilometres, { field: "Additional distance", fieldId: "additional-km", max: 1_000_000 });
   const passengerCount = parseNumber(input.passengerCount ?? 1, { field: "Passenger count", fieldId: "passenger-count", min: 1, max: 100_000, required: true, integer: true });
 
-  const totalDistance = oneWayDistance * tripMultiplier + additionalKilometres;
+  const totalDistance = oneWayDistance * tripMultiplier;
   if (!(totalDistance > 0)) throw new ValidationError("Total distance must be greater than zero.", "Total distance", "one-way-distance");
 
   let fuelConsumption = 0;
@@ -103,9 +118,8 @@ export function calculateJourney(input = {}) {
   return {
     oneWayDistance,
     tripMultiplier,
-    additionalKilometres,
     totalDistance,
-    durationSeconds: parseNumber(input.durationSeconds, { field: "Duration", fieldId: "manual-duration", max: 31_536_000_000 }),
+    durationSeconds: parseNumber(input.durationSeconds, { field: "Duration", fieldId: "manual-duration", max: 36_000_000_000 }),
     energyType,
     fuelConsumption,
     electricConsumption,

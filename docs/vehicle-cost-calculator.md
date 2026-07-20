@@ -7,23 +7,22 @@ Open the app from `apps/vehicle-cost-calculator.html` or directly at `tools/vehi
 ## What the user enters
 
 - Optional journey name and notes for saved calculations
-- One-way distance and optional one-way duration
+- One-way distance and optional one-way duration in `00h00` format
 - One-way, return, or custom trip multiplier
-- Optional additional kilometres
 - Vehicle energy type and consumption
 - Fuel or electricity price
 - Outbound and return tolls
 - Ferry, parking, maintenance, and custom costs
 - Number of passengers
 
-Route details are informational. The distance, duration, tolls, and prices used in a calculation are entered manually by the user.
+The distance, duration, tolls, and prices used in a calculation are entered manually by the user.
 
 ## Calculations
 
 Total distance:
 
 ```text
-one-way distance × trip multiplier + additional kilometres
+one-way distance × trip multiplier
 ```
 
 Fuel or electricity quantity:
@@ -84,7 +83,7 @@ Structured records use IndexedDB. Currency and theme preferences use localStorag
 
 The calculator does not contact mapping, routing, toll, analytics, advertising, telemetry, or cloud services. Journey details remain in the current browser unless the user explicitly exports a file. Clearing browser storage can remove saved information, so important data should be backed up.
 
-Database version 3 removes obsolete online-route and location fields while preserving existing vehicles, fill-ups, journeys, and price history.
+Database version 4 removes obsolete online-route, location, and additional-distance fields while preserving existing vehicles, fill-ups, journeys, and price history.
 
 ## Files
 
@@ -103,7 +102,7 @@ Open `tools/vehicle-cost-calculator/tests.html` through GitHub Pages or a static
 The suite covers:
 
 - Every supported energy type
-- Journey multipliers and additional distance
+- Journey multipliers and `00h00` duration validation
 - Tolls and other manual costs
 - Passenger splitting and numeric validation
 - Field-level validation for missing, malformed, negative, out-of-range, and non-integer values
