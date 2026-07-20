@@ -524,7 +524,6 @@ async function calculateForm(event) {
   clearValidation($("#journey-form"));
   $("#form-errors").hidden = true;
   try {
-    requireNativeValidity($("#journey-form"));
     const { raw, result, journey } = collectJourney();
     state.currentInput = { raw: structuredClone(raw), journey: structuredClone(journey) };
     state.currentResult = result;
