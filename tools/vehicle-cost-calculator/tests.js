@@ -1,4 +1,4 @@
-import { ValidationError, calculateFillUpConsumption, calculateJourney, formatCurrency, formatDurationInput, parseDuration, parseNumber } from "./calculations.js?v=7";
+import { ValidationError, calculateFillUpConsumption, calculateJourney, formatCurrency, formatDurationInput, parseDuration, parseNumber, sanitiseDecimalInput, sanitiseIntegerInput } from "./calculations.js?v=8";
 import { CalculatorStorage } from "./storage.js?v=6";
 
 const results = [];
@@ -36,6 +36,9 @@ await test("Currency display rounds to two decimals", () => assert(/12[,.]35/.te
 await test("Decimal comma input", () => close(calculateJourney({ ...base, fuelConsumption: "6,5" }).fuelQuantity, 6.5));
 await test("Locale-formatted number input", () => close(parseNumber("1.234,56"), 1234.56));
 await test("Malformed grouped number rejected", () => { let threw = false; try { parseNumber("1,2,3.4"); } catch { threw = true; } assert(threw); });
+await test("Letters removed from decimal inputs", () => assert(sanitiseDecimalInput("1.95abc") === "1.95" && sanitiseDecimalInput("abc") === ""));
+await test("Decimal inputs keep only one separator", () => assert(sanitiseDecimalInput("12,3.4") === "12,34"));
+await test("Integer inputs remove non-digits", () => assert(sanitiseIntegerInput("12e3 people") === "123"));
 await test("Invalid numeric input rejected", () => { let threw = false; try { calculateJourney({ ...base, fuelPrice: "abc" }); } catch (error) { threw = error instanceof ValidationError; } assert(threw); });
 await test("Negative values rejected", () => { let threw = false; try { calculateJourney({ ...base, parkingCost: -1 }); } catch { threw = true; } assert(threw); });
 await test("Negative tolls rejected", () => { let threw = false; try { calculateJourney({ ...base, outboundToll: -1 }); } catch { threw = true; } assert(threw); });

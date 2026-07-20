@@ -10,7 +10,9 @@ import {
   makeId,
   parseDuration,
   parseNumber,
-} from "./calculations.js?v=7";
+  sanitiseDecimalInput,
+  sanitiseIntegerInput,
+} from "./calculations.js?v=8";
 import { CalculatorStorage, StorageError } from "./storage.js?v=6";
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -787,6 +789,8 @@ function bindEvents() {
   $("#delete-all-data").addEventListener("click", deleteAllData);
   document.addEventListener("input", (event) => {
     if (!(event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement)) return;
+    if (event.target.matches('input[inputmode="decimal"]')) event.target.value = sanitiseDecimalInput(event.target.value);
+    if (event.target.matches('input[type="number"]')) event.target.value = sanitiseIntegerInput(event.target.value);
     clearFieldError(event.target);
     if ($("#journey-form").contains(event.target)) $("#form-errors").hidden = true;
   });

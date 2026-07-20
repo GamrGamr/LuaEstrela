@@ -106,6 +106,7 @@ The suite covers:
 - Tolls and other manual costs
 - Passenger splitting and numeric validation
 - Field-level validation for missing, malformed, negative, out-of-range, and non-integer values
+- Immediate letter filtering in decimal distance, consumption, price, and cost fields
 - Full-tank consumption measurement
 - IndexedDB create, update, read, delete, backup, and import
 - Removal of obsolete online-route data without losing saved records

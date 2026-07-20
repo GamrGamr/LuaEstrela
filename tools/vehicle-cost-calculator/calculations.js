@@ -57,6 +57,22 @@ export function parseDuration(value, { field = "Duration", fieldId = "manual-dur
   return Number(match[1]) * 3600 + Number(match[2]) * 60;
 }
 
+export function sanitiseDecimalInput(value) {
+  let separatorUsed = false;
+  return [...String(value ?? "")].reduce((result, character) => {
+    if (/\d/.test(character)) return result + character;
+    if ((character === "." || character === ",") && !separatorUsed) {
+      separatorUsed = true;
+      return result + character;
+    }
+    return result;
+  }, "");
+}
+
+export function sanitiseIntegerInput(value) {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
 export function formatDurationInput(seconds) {
   const totalMinutes = Math.max(0, Math.round((Number(seconds) || 0) / 60));
   if (!totalMinutes) return "00h00";
