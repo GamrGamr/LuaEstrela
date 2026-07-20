@@ -1,7 +1,22 @@
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 export const DATABASE_NAME = "estrela-lua-vehicle-cost-calculator";
 export const BACKUP_VERSION = 1;
-export const STORE_NAMES = ["vehicles", "fillups", "journeys", "routeCache", "fuelPrices"];
+export const STORE_NAMES = ["vehicles", "fillups", "journeys", "fuelPrices"];
+
+const REMOVED_VEHICLE_FIELDS = ["tollCategory", "registrationCountry", "emissionsCategory", "axleCount", "tollPasses"];
+const REMOVED_JOURNEY_FIELDS = ["mapSource", "provider", "routeSelection", "tollSource"];
+
+function sanitiseRecord(storeName, record) {
+  const copy = structuredClone(record);
+  if (storeName === "vehicles") REMOVED_VEHICLE_FIELDS.forEach((field) => delete copy[field]);
+  if (storeName === "journeys") {
+    REMOVED_JOURNEY_FIELDS.forEach((field) => delete copy[field]);
+    [copy.input, copy.result].filter(Boolean).forEach((details) => {
+      ["returnDistance", "tollStatus", "tollSource"].forEach((field) => delete details[field]);
+    });
+  }
+  return copy;
+}
 
 export class StorageError extends Error {
   constructor(message, cause) {
@@ -39,11 +54,27 @@ export class CalculatorStorage {
     const request = indexedDB.open(this.databaseName, DATABASE_VERSION);
     request.onupgradeneeded = () => {
       const database = request.result;
+      if (database.objectStoreNames.contains("routeCache")) database.deleteObjectStore("routeCache");
       STORE_NAMES.forEach((name) => {
         if (!database.objectStoreNames.contains(name)) database.createObjectStore(name, { keyPath: "id" });
       });
+      ["vehicles", "journeys"].forEach((storeName) => {
+        const cursorRequest = request.transaction.objectStore(storeName).openCursor();
+        cursorRequest.onsuccess = () => {
+          const cursor = cursorRequest.result;
+          if (!cursor) return;
+          cursor.update(sanitiseRecord(storeName, cursor.value));
+          cursor.continue();
+        };
+      });
     };
     this.database = await requestResult(request);
+    try {
+      localStorage.removeItem(`${this.settingsPrefix}routeCacheHours`);
+      localStorage.removeItem(`${this.settingsPrefix}providerEndpoint`);
+    } catch {
+      // The calculator still works when localStorage is unavailable.
+    }
     this.database.onversionchange = () => {
       this.database.close();
       this.database = null;
@@ -56,9 +87,10 @@ export class CalculatorStorage {
     if (!value?.id) throw new StorageError(`An id is required for ${storeName}.`);
     const database = await this.open();
     const transaction = database.transaction(storeName, "readwrite");
-    transaction.objectStore(storeName).put(structuredClone(value));
+    const cleanValue = sanitiseRecord(storeName, value);
+    transaction.objectStore(storeName).put(cleanValue);
     await transactionDone(transaction);
-    return structuredClone(value);
+    return structuredClone(cleanValue);
   }
 
   async get(storeName, id) {
@@ -85,30 +117,6 @@ export class CalculatorStorage {
     const transaction = database.transaction(storeName, "readwrite");
     transaction.objectStore(storeName).clear();
     await transactionDone(transaction);
-  }
-
-  async clearRouteCache() {
-    await this.clearStore("routeCache");
-  }
-
-  async getRouteCache(id) {
-    const entry = await this.get("routeCache", id);
-    if (!entry) return null;
-    if (Number(entry.expiresAt) <= Date.now()) {
-      await this.remove("routeCache", id);
-      return null;
-    }
-    return entry;
-  }
-
-  async setRouteCache(id, value, ttlHours = 12) {
-    const now = Date.now();
-    return this.put("routeCache", {
-      id,
-      ...structuredClone(value),
-      createdAt: now,
-      expiresAt: now + Math.max(1, Number(ttlHours) || 12) * 60 * 60 * 1000,
-    });
   }
 
   getSetting(key, fallback = null) {
@@ -147,8 +155,6 @@ export class CalculatorStorage {
       settings: {
         currency: this.getSetting("currency", "EUR"),
         theme: this.getSetting("theme", "light"),
-        routeCacheHours: this.getSetting("routeCacheHours", 12),
-        providerEndpoint: this.getSetting("providerEndpoint", ""),
       },
     };
   }
@@ -182,11 +188,13 @@ export class CalculatorStorage {
     const transaction = database.transaction(STORE_NAMES, "readwrite");
     if (mode === "replace") STORE_NAMES.forEach((name) => transaction.objectStore(name).clear());
     STORE_NAMES.forEach((name) => {
-      (backup.data[name] || []).forEach((item) => transaction.objectStore(name).put(structuredClone(item)));
+      (backup.data[name] || []).forEach((item) => transaction.objectStore(name).put(sanitiseRecord(name, item)));
     });
     await transactionDone(transaction);
     if (backup.settings && typeof backup.settings === "object") {
-      Object.entries(backup.settings).forEach(([key, value]) => this.setSetting(key, value));
+      ["currency", "theme"].forEach((key) => {
+        if (Object.hasOwn(backup.settings, key)) this.setSetting(key, backup.settings[key]);
+      });
     }
   }
 
@@ -203,23 +211,4 @@ export class CalculatorStorage {
     });
     this.clearSettings();
   }
-}
-
-export function normaliseRouteCacheKey(request, providerName = "manual") {
-  const stable = {
-    provider: providerName,
-    origin: String(request.origin || "").trim().toLowerCase(),
-    destination: String(request.destination || "").trim().toLowerCase(),
-    stops: (request.stops || []).map((item) => String(item).trim().toLowerCase()).filter(Boolean),
-    avoidTolls: Boolean(request.avoidTolls),
-    tollPreference: request.tollPreference || "standard",
-    currency: request.currency || "EUR",
-    alternatives: Boolean(request.alternatives),
-  };
-  let hash = 2166136261;
-  for (const character of JSON.stringify(stable)) {
-    hash ^= character.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `route-${(hash >>> 0).toString(36)}`;
 }

@@ -43,13 +43,7 @@ export function calculateJourney(input = {}) {
   const passengerCount = parseNumber(input.passengerCount ?? 1, { field: "Passenger count", min: 1, required: true });
   if (!Number.isInteger(passengerCount)) throw new ValidationError("Passenger count must be a whole number.", "Passenger count");
 
-  const returnDistance = input.returnDistance === "" || input.returnDistance === undefined || input.returnDistance === null
-    ? null
-    : parseNumber(input.returnDistance, { field: "Return distance", required: true });
-  const routedDistance = returnDistance !== null && tripMultiplier === 2
-    ? oneWayDistance + returnDistance
-    : oneWayDistance * tripMultiplier;
-  const totalDistance = routedDistance + additionalKilometres;
+  const totalDistance = oneWayDistance * tripMultiplier + additionalKilometres;
   if (!(totalDistance > 0)) throw new ValidationError("Total distance must be greater than zero.", "Total distance");
 
   let fuelConsumption = 0;
@@ -95,7 +89,6 @@ export function calculateJourney(input = {}) {
 
   return {
     oneWayDistance,
-    returnDistance,
     tripMultiplier,
     additionalKilometres,
     totalDistance,
@@ -113,8 +106,6 @@ export function calculateJourney(input = {}) {
     outboundToll,
     returnToll,
     totalTolls,
-    tollSource: input.tollSource || "Manual value",
-    tollStatus: input.tollStatus || (totalTolls > 0 ? "manual" : "unknown"),
     ferryCost,
     parkingCost,
     maintenanceRate,
@@ -256,7 +247,6 @@ export function buildJourneySummary(journey, result) {
   if (result.electricQuantity) lines.push(`Electricity required: ${formatNumber(result.electricQuantity)} kWh`, `Electricity cost: ${formatCurrency(result.electricityCost, result.currency)}`);
   lines.push(
     `Tolls: ${formatCurrency(result.totalTolls, result.currency)}`,
-    `Toll source: ${result.tollSource}`,
     `Ferry: ${formatCurrency(result.ferryCost, result.currency)}`,
     `Parking: ${formatCurrency(result.parkingCost, result.currency)}`,
     `Maintenance: ${formatCurrency(result.maintenanceCost, result.currency)}`,

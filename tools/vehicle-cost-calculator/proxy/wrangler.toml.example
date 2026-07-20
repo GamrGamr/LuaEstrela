@@ -1,9 +1,0 @@
-name = "estrela-lua-route-proxy"
-main = "cloudflare-worker.js"
-compatibility_date = "2026-07-01"
-
-[vars]
-ALLOWED_ORIGINS = "https://gamrgamr.github.io"
-
-# Add the HERE key as a secret; never write it in this file:
-# npx wrangler secret put HERE_API_KEY

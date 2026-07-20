@@ -1,7 +1,5 @@
 import { ValidationError, calculateFillUpConsumption, calculateJourney, formatCurrency } from "./calculations.js";
 import { CalculatorStorage } from "./storage.js";
-import { parseRouteLink } from "./route-links.js";
-import { MockRouteProvider, TOLL_STATES } from "./route-provider.js";
 
 const results = [];
 const base = { oneWayDistance: 100, tripMultiplier: 1, passengerCount: 1, energyType: "petrol", fuelConsumption: 6, fuelPrice: 2, currency: "EUR" };
@@ -21,7 +19,6 @@ await test("Plug-in hybrid combines fuel and electricity", () => { const result 
 await test("Electric calculation", () => { const result = calculateJourney({ ...base, energyType: "electric", electricConsumption: 18, electricityPrice: .25 }); close(result.electricQuantity, 18); close(result.electricityCost, 4.5); });
 await test("One-way journey", () => close(calculateJourney(base).totalDistance, 100));
 await test("Return journey", () => close(calculateJourney({ ...base, tripMultiplier: 2 }).totalDistance, 200));
-await test("Return route can use a separately calculated distance", () => close(calculateJourney({ ...base, tripMultiplier: 2, returnDistance: 110 }).totalDistance, 210));
 await test("Separate outbound and return tolls", () => { const result = calculateJourney({ ...base, outboundToll: 10, returnToll: 12 }); close(result.totalTolls, 22); });
 await test("Custom multiplier", () => close(calculateJourney({ ...base, tripMultiplier: 1.5 }).totalDistance, 150));
 await test("Additional kilometres", () => close(calculateJourney({ ...base, additionalKilometres: 25 }).totalDistance, 125));
@@ -33,6 +30,7 @@ await test("Currency display rounds to two decimals", () => assert(/12[,.]35/.te
 await test("Decimal comma input", () => close(calculateJourney({ ...base, fuelConsumption: "6,5" }).fuelQuantity, 6.5));
 await test("Invalid numeric input rejected", () => { let threw = false; try { calculateJourney({ ...base, fuelPrice: "abc" }); } catch (error) { threw = error instanceof ValidationError; } assert(threw); });
 await test("Negative values rejected", () => { let threw = false; try { calculateJourney({ ...base, parkingCost: -1 }); } catch { threw = true; } assert(threw); });
+await test("Negative tolls rejected", () => { let threw = false; try { calculateJourney({ ...base, outboundToll: -1 }); } catch { threw = true; } assert(threw); });
 await test("Zero passengers prevented", () => { let threw = false; try { calculateJourney({ ...base, passengerCount: 0 }); } catch { threw = true; } assert(threw); });
 await test("NaN and Infinity prevented", () => { let threw = false; try { calculateJourney({ ...base, fuelPrice: Infinity }); } catch { threw = true; } assert(threw); });
 
@@ -63,21 +61,36 @@ await test("Loading journeys", async () => assert((await testStorage.getAll("jou
 await test("Exporting JSON backup", async () => { const backup = await testStorage.exportAll(); assert(backup.application === "Vehicle Cost Calculator" && backup.data.journeys.length === 1); });
 await test("Importing JSON backup", async () => { const backup = await testStorage.exportAll(); backup.data.vehicles.push({ id: "vehicle-imported", name: "Imported" }); await testStorage.importAll(backup, "merge"); assert(Boolean(await testStorage.get("vehicles", "vehicle-imported"))); });
 await test("Rejecting malformed backup", () => { let threw = false; try { testStorage.validateBackup({ application: "Wrong", version: 1, data: {} }); } catch { threw = true; } assert(threw); });
-await test("Route cache expires", async () => { await testStorage.put("routeCache", { id: "expired", value: 1, expiresAt: Date.now() - 1 }); assert(await testStorage.getRouteCache("expired") === null); });
 
-await test("Google Maps route-link parsing", () => { const route = parseRouteLink("https://www.google.com/maps/dir/?api=1&origin=Lisbon&destination=Porto&waypoints=Coimbra"); assert(route.provider === "Google Maps" && route.origin === "Lisbon" && route.destination === "Porto" && route.stops[0] === "Coimbra"); });
-await test("Apple Maps route-link parsing", () => { const route = parseRouteLink("https://maps.apple.com/?saddr=Lisbon&daddr=Porto"); assert(route.provider === "Apple Maps" && route.destination === "Porto"); });
-await test("Waze route-link parsing", () => { const route = parseRouteLink("https://www.waze.com/live-map/directions?from=Lisbon&to=Porto"); assert(route.provider === "Waze" && route.origin === "Lisbon"); });
-await test("Unsupported URL scheme rejected", () => assert(parseRouteLink("javascript:alert(1)").valid === false));
-await test("Malformed route link handled safely", () => assert(parseRouteLink("not a url").valid === false));
-await test("Unknown toll status remains unknown", () => { const result = calculateJourney({ ...base, tollStatus: TOLL_STATES.UNKNOWN, tollSource: "Toll status unknown" }); assert(result.tollStatus === TOLL_STATES.UNKNOWN); });
-await test("Provider-estimated toll preserved", () => { const result = calculateJourney({ ...base, outboundToll: 12, tollStatus: TOLL_STATES.PROVIDER_ESTIMATE }); assert(result.tollStatus === TOLL_STATES.PROVIDER_ESTIMATE && result.totalTolls === 12); });
-await test("Manual toll override preserved", () => { const result = calculateJourney({ ...base, outboundToll: 9, tollStatus: TOLL_STATES.MANUAL_OVERRIDE }); assert(result.tollStatus === TOLL_STATES.MANUAL_OVERRIDE); });
-await test("Mock provider returns real-shaped route", async () => { const provider = new MockRouteProvider({ provider: "Mock", routes: [{ id: "r1", distanceKm: 100, durationSeconds: 3600, toll: { state: "provider_estimate", amount: 10 } }] }); assert((await provider.calculateRoute()).routes[0].distanceKm === 100); });
-await test("Provider failure falls back without fabricated result", async () => { const provider = new MockRouteProvider({}, true); let threw = false; try { await provider.calculateRoute(); } catch { threw = true; } assert(threw); });
+const migrationDatabase = `vcc-migration-${Date.now()}`;
+await new Promise((resolve, reject) => {
+  const request = indexedDB.open(migrationDatabase, 1);
+  request.onupgradeneeded = () => {
+    ["vehicles", "fillups", "journeys", "routeCache", "fuelPrices"].forEach((name) => request.result.createObjectStore(name, { keyPath: "id" }));
+  };
+  request.onerror = () => reject(request.error);
+  request.onsuccess = () => {
+    const database = request.result;
+    const transaction = database.transaction(["vehicles", "journeys", "routeCache"], "readwrite");
+    transaction.objectStore("vehicles").put({ id: "old-vehicle", name: "Existing car", tollCategory: "passenger-car", axleCount: 2 });
+    transaction.objectStore("journeys").put({ id: "old-journey", name: "Existing journey", provider: "Old service", routeSelection: { id: "route" }, input: { oneWayDistance: 10, tollSource: "Old service" } });
+    transaction.objectStore("routeCache").put({ id: "old-route", value: 1 });
+    transaction.oncomplete = () => { database.close(); resolve(); };
+    transaction.onerror = () => reject(transaction.error);
+  };
+});
+const migrationStorage = new CalculatorStorage(migrationDatabase, `${migrationDatabase}:`);
+await test("Online-route data is removed without losing saved records", async () => {
+  const database = await migrationStorage.open();
+  assert(!database.objectStoreNames.contains("routeCache"));
+  const vehicle = await migrationStorage.get("vehicles", "old-vehicle");
+  const journey = await migrationStorage.get("journeys", "old-journey");
+  assert(vehicle.name === "Existing car" && !("tollCategory" in vehicle) && journey.name === "Existing journey" && !("provider" in journey) && !("tollSource" in journey.input));
+});
 await test("Relative calculator path works under /EstrelaLua/", () => { const target = new URL("../../apps/vehicle-cost-calculator.html", "https://gamrgamr.github.io/EstrelaLua/tools/vehicle-cost-calculator/index.html"); assert(target.pathname === "/EstrelaLua/apps/vehicle-cost-calculator.html"); });
 
 await testStorage.deleteAll().catch(() => {});
+await migrationStorage.deleteAll().catch(() => {});
 
 const passed = results.filter((result) => result.pass).length;
 const failed = results.length - passed;

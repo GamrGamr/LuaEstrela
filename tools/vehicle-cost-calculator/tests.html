@@ -15,13 +15,13 @@
       .test-list .fail { border-left: 5px solid var(--danger); }
       .test-list small { display: block; margin-top: 5px; color: var(--muted); }
     </style>
-    <script type="module" src="tests.js?v=2"></script>
+    <script type="module" src="tests.js?v=3"></script>
   </head>
   <body>
     <main class="test-shell">
       <p class="kicker">Dependency-free browser tests</p>
       <h1>Vehicle Cost Calculator</h1>
-      <p>These tests use only mocked provider data and a temporary IndexedDB database. They do not make paid or live route requests.</p>
+      <p>These tests cover the manual calculations and a temporary IndexedDB database. They do not make network requests.</p>
       <div class="test-summary" aria-live="polite"><strong id="test-total">Running…</strong><strong id="test-passed">0 passed</strong><strong id="test-failed">0 failed</strong></div>
       <ul id="test-results" class="test-list"></ul>
       <p><a class="secondary-button" href="index.html">Return to calculator</a></p>

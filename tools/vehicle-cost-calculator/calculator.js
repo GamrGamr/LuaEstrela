@@ -9,9 +9,7 @@ import {
   makeId,
   parseNumber,
 } from "./calculations.js";
-import { CalculatorStorage, StorageError, normaliseRouteCacheKey } from "./storage.js";
-import { parseRouteLink } from "./route-links.js";
-import { ProxyRouteProvider, RouteProviderError, TOLL_LABELS, TOLL_STATES } from "./route-provider.js";
+import { CalculatorStorage, StorageError } from "./storage.js";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -23,11 +21,6 @@ const state = {
   currentResult: null,
   currentInput: null,
   currentJourneyId: null,
-  routeSelection: null,
-  routeChoices: [],
-  tollStatus: TOLL_STATES.UNKNOWN,
-  tollSource: TOLL_LABELS[TOLL_STATES.UNKNOWN],
-  mapSource: "Manual entry",
   pendingBackup: null,
   storageAvailable: true,
 };
@@ -95,22 +88,6 @@ function updateCurrencyLabels() {
 function applyTheme(theme) {
   const dark = theme === "dark" || (theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
   document.body.dataset.theme = dark ? "dark" : "light";
-}
-
-function providerEndpoint() {
-  return String(storage.getSetting("providerEndpoint", "") || "").trim();
-}
-
-function updateProviderStatus(status = "idle") {
-  const endpoint = providerEndpoint();
-  const dot = $("#provider-dot");
-  dot.className = `status-dot${status === "working" ? " working" : endpoint ? " online" : ""}`;
-  $("#provider-mode").textContent = status === "working" ? "Contacting route provider" : endpoint ? "Online routing available" : "Manual mode";
-  $("#provider-description").textContent = status === "working"
-    ? "Route locations and options are being sent through the configured secure proxy."
-    : endpoint
-      ? "HERE routing and toll estimates are available through your configured secure proxy."
-      : "No route provider configured. All manual calculations stay in this browser.";
 }
 
 async function reloadData() {
@@ -233,7 +210,6 @@ function useVehicle(vehicle) {
   safeValue("fuel-consumption", vehicle?.manualConsumption || "");
   safeValue("electric-consumption", vehicle?.manualElectricConsumption || "");
   safeValue("maintenance-rate", vehicle?.maintenanceRate || 0);
-  safeValue("toll-category", vehicle?.tollCategory || "passenger-car");
   safeValue("passenger-count", vehicle?.defaultPassengerCount || 1);
   updateEnergyFields();
   applyConsumptionSource();
@@ -257,11 +233,6 @@ function profileFromForm(existing = null) {
     manualElectricConsumption: parseNumber(value("profile-electric-consumption"), { field: "Manual electric consumption" }),
     preferredConsumptionSource: value("profile-preferred-source"),
     maintenanceRate: parseNumber(value("profile-maintenance"), { field: "Maintenance cost per kilometre" }),
-    tollCategory: value("profile-toll-category"),
-    registrationCountry: value("profile-country").trim(),
-    emissionsCategory: value("profile-emissions").trim(),
-    axleCount: parseNumber(value("profile-axles") || 2, { field: "Number of axles", min: 1, required: true }),
-    tollPasses: value("profile-toll-passes").split(",").map((item) => item.trim()).filter(Boolean),
     defaultPassengerCount: parseNumber(value("profile-passengers") || 1, { field: "Default passengers", min: 1, required: true }),
     notes: value("profile-notes").trim(),
     archived: checked("profile-archived"),
@@ -285,12 +256,7 @@ function openVehicleDialog(vehicle = null, duplicate = false) {
   safeValue("profile-electric-consumption", copy?.manualElectricConsumption || "");
   safeValue("profile-preferred-source", copy?.preferredConsumptionSource || "manual");
   safeValue("profile-maintenance", copy?.maintenanceRate || "");
-  safeValue("profile-toll-category", copy?.tollCategory || "passenger-car");
-  safeValue("profile-country", copy?.registrationCountry || "");
-  safeValue("profile-emissions", copy?.emissionsCategory || "");
-  safeValue("profile-axles", copy?.axleCount || 2);
   safeValue("profile-passengers", copy?.defaultPassengerCount || 1);
-  safeValue("profile-toll-passes", (copy?.tollPasses || []).join(", "));
   safeValue("profile-notes", copy?.notes || "");
   $("#profile-archived").checked = copy?.archived || false;
   message($("#vehicle-form-status"));
@@ -412,180 +378,21 @@ async function deleteFillup(id) {
   applyConsumptionSource();
 }
 
-function importMapLink() {
-  const parsed = parseRouteLink(value("map-link"));
-  state.mapSource = parsed.provider || "Manual entry";
-  if (!parsed.valid) {
-    message($("#link-feedback"), parsed.warnings?.join(" ") || "This link could not be imported.", "error");
-    return;
-  }
-  if (parsed.origin) safeValue("origin", parsed.origin);
-  if (parsed.destination) safeValue("destination", parsed.destination);
-  if (parsed.stops?.length) safeValue("stops", parsed.stops.join("\n"));
-  const found = [parsed.origin && "origin", parsed.destination && "destination", parsed.stops?.length && `${parsed.stops.length} stop(s)`].filter(Boolean).join(", ");
-  message($("#link-feedback"), `${parsed.provider} detected${found ? `; found ${found}` : ""}. ${parsed.warnings?.join(" ") || "Confirm the imported locations before routing."}`, parsed.warnings?.length ? "warning" : "success");
-}
-
-function getRouteRequest(origin = value("origin"), destination = value("destination"), stops = value("stops").split("\n").map((item) => item.trim()).filter(Boolean)) {
-  const vehicle = activeVehicle();
-  return {
-    origin, destination, stops,
-    avoidTolls: value("avoid-tolls") === "true",
-    alternatives: true,
-    currency: value("currency").trim().toUpperCase() || "EUR",
-    tollPreference: value("toll-preference"),
-    vehicle: {
-      category: value("toll-category"), energyType: value("energy-type"),
-      emissionsCategory: vehicle?.emissionsCategory || "", registrationCountry: vehicle?.registrationCountry || "",
-      axleCount: vehicle?.axleCount || 2, tollPasses: vehicle?.tollPasses || [],
-    },
-  };
-}
-
-async function routeDirection(provider, request) {
-  const cacheKey = normaliseRouteCacheKey(request, provider.getProviderName());
-  const cached = await storage.getRouteCache(cacheKey).catch(() => null);
-  if (cached?.providerResult) return { ...cached.providerResult, cached: true };
-  const result = await provider.calculateRoute(request);
-  await storage.setRouteCache(cacheKey, { providerResult: result }, storage.getSetting("routeCacheHours", 12)).catch(() => {});
-  return result;
-}
-
-async function calculateOnlineRoute() {
-  const endpoint = providerEndpoint();
-  if (!endpoint) {
-    message($("#route-status"), "Automatic routing is not configured. Enter the distance manually or add a secure proxy URL in Settings.", "warning");
-    $("#settings-section").scrollIntoView({ behavior: "smooth" });
-    return;
-  }
-  try {
-    const request = getRouteRequest();
-    if (!request.origin || !request.destination) throw new RouteProviderError("Enter both origin and destination before calculating a route.", "invalid_request");
-    const provider = new ProxyRouteProvider(endpoint);
-    updateProviderStatus("working");
-    $("#calculate-route").disabled = true;
-    message($("#route-status"), "Contacting the external route provider through the secure proxy…", "warning");
-    const outbound = await routeDirection(provider, request);
-    let inbound = null;
-    if (Number(value("trip-multiplier")) === 2) {
-      inbound = await routeDirection(provider, getRouteRequest(request.destination, request.origin, [...request.stops].reverse()));
-    }
-    const choices = outbound.routes.map((route, index) => ({
-      outbound: route,
-      inbound: inbound?.routes[index] || inbound?.routes[0] || null,
-      provider: outbound.provider,
-      cached: Boolean(outbound.cached || inbound?.cached),
-    }));
-    state.routeChoices = choices;
-    renderRouteChoices();
-    applyRouteChoice(0);
-    message($("#route-status"), `${outbound.provider} returned ${choices.length} route option${choices.length === 1 ? "" : "s"}${choices[0].cached ? " from the local cache" : ""}. Review the estimate before calculating.`, "success");
-  } catch (error) {
-    state.tollStatus = TOLL_STATES.PROVIDER_UNAVAILABLE;
-    state.tollSource = TOLL_LABELS[state.tollStatus];
-    updateTollDisplay();
-    message($("#route-status"), error.message || "The route provider is unavailable. Your entries were kept; continue in manual mode.", "error");
-  } finally {
-    $("#calculate-route").disabled = false;
-    updateProviderStatus();
-  }
-}
-
-function routePreview(choice) {
-  try {
-    return calculateJourney({
-      ...rawJourneyValues(),
-      oneWayDistance: choice.outbound.distanceKm,
-      returnDistance: choice.inbound?.distanceKm ?? null,
-      outboundToll: choice.outbound.toll.amount ?? 0,
-      returnToll: choice.inbound?.toll.amount ?? 0,
-    });
-  } catch {
-    return null;
-  }
-}
-
-function renderRouteChoices() {
-  const container = $("#route-alternatives");
-  const previews = state.routeChoices.map(routePreview);
-  const distances = state.routeChoices.map((choice) => choice.outbound.distanceKm + (choice.inbound?.distanceKm || 0));
-  const durations = state.routeChoices.map((choice) => choice.outbound.durationSeconds + (choice.inbound?.durationSeconds || 0));
-  const costs = previews.map((preview) => preview?.totalCost ?? Infinity);
-  const minimum = (values) => Math.min(...values);
-  container.innerHTML = state.routeChoices.map((choice, index) => {
-    const totalDistance = choice.outbound.distanceKm + (choice.inbound?.distanceKm || 0);
-    const duration = choice.outbound.durationSeconds + (choice.inbound?.durationSeconds || 0);
-    const preview = previews[index];
-    const toll = (choice.outbound.toll.amount ?? 0) + (choice.inbound?.toll.amount ?? 0);
-    const tags = [];
-    if (duration === minimum(durations)) tags.push("Fastest");
-    if (totalDistance === minimum(distances)) tags.push("Shortest");
-    if (preview && preview.totalCost === minimum(costs)) tags.push("Lowest cost");
-    if (choice.outbound.toll.state === TOLL_STATES.NO_TOLLS && (!choice.inbound || choice.inbound.toll.state === TOLL_STATES.NO_TOLLS)) tags.push("Toll-free");
-    return `<label class="route-option"><input type="radio" name="route-choice" value="${index}" ${index === 0 ? "checked" : ""} /><span><strong>${escapeHtml(choice.outbound.name)}${tags.length ? ` · ${escapeHtml(tags.join(" · "))}` : ""}</strong><small>${formatNumber(totalDistance || choice.outbound.distanceKm, 1)} km · ${formatDuration(duration || choice.outbound.durationSeconds)} · Tolls ${toll ? formatCurrency(toll, value("currency")) : escapeHtml(choice.outbound.toll.label)}</small></span><strong>${preview ? formatCurrency(preview.totalCost, preview.currency) : "Select"}</strong></label>`;
-  }).join("");
-}
-
-function combinedTollState(choice) {
-  const states = [choice.outbound.toll.state, choice.inbound?.toll.state].filter(Boolean);
-  if (states.some((item) => item === TOLL_STATES.DETECTED_NO_PRICE)) return TOLL_STATES.DETECTED_NO_PRICE;
-  if (states.some((item) => item === TOLL_STATES.UNKNOWN)) return TOLL_STATES.UNKNOWN;
-  if (states.every((item) => item === TOLL_STATES.NO_TOLLS)) return TOLL_STATES.NO_TOLLS;
-  if (states.some((item) => item === TOLL_STATES.PASS_ESTIMATE)) return TOLL_STATES.PASS_ESTIMATE;
-  if (states.some((item) => item === TOLL_STATES.CASH_ESTIMATE)) return TOLL_STATES.CASH_ESTIMATE;
-  return TOLL_STATES.PROVIDER_ESTIMATE;
-}
-
-function applyRouteChoice(index) {
-  const choice = state.routeChoices[index];
-  if (!choice) return;
-  state.routeSelection = structuredClone(choice);
-  safeValue("one-way-distance", choice.outbound.distanceKm.toFixed(3));
-  safeValue("manual-duration", Math.round(choice.outbound.durationSeconds / 60));
-  state.tollStatus = combinedTollState(choice);
-  state.tollSource = `${choice.provider}${choice.cached ? " · cached route" : ""} · ${TOLL_LABELS[state.tollStatus]}`;
-  if (choice.outbound.toll.amount !== null) safeValue("outbound-toll", choice.outbound.toll.amount.toFixed(2));
-  else if (choice.outbound.toll.state === TOLL_STATES.NO_TOLLS) safeValue("outbound-toll", "0");
-  if (choice.inbound?.toll.amount !== null && choice.inbound) safeValue("return-toll", choice.inbound.toll.amount.toFixed(2));
-  else if (choice.inbound?.toll.state === TOLL_STATES.NO_TOLLS) safeValue("return-toll", "0");
-  else if (!choice.inbound) safeValue("return-toll", "0");
-  $("#manual-toll-override").checked = false;
-  updateTollDisplay(choice);
-}
-
-function updateTollDisplay(choice = state.routeSelection) {
-  $("#toll-source-badge").textContent = TOLL_LABELS[state.tollStatus] || state.tollSource;
-  const warnings = [...(choice?.outbound?.toll?.warnings || []), ...(choice?.inbound?.toll?.warnings || [])];
-  const comparisons = [];
-  if (choice?.outbound?.toll?.cashAmount !== null && choice?.outbound?.toll?.cashAmount !== undefined) comparisons.push(`Outbound cash/card: ${formatCurrency(choice.outbound.toll.cashAmount, value("currency"))}`);
-  if (choice?.outbound?.toll?.passAmount !== null && choice?.outbound?.toll?.passAmount !== undefined) comparisons.push(`Outbound pass: ${formatCurrency(choice.outbound.toll.passAmount, value("currency"))}`);
-  let guidance = state.tollSource;
-  if (state.tollStatus === TOLL_STATES.DETECTED_NO_PRICE) guidance = "Tolls were detected on this route, but the routing provider could not supply a price. Enter the toll amount manually.";
-  else if (state.tollStatus === TOLL_STATES.UNKNOWN || state.tollStatus === TOLL_STATES.PROVIDER_UNAVAILABLE) guidance = "No confirmed toll amount is available. Enter tolls manually or mark the route as having no tolls.";
-  else if (state.tollStatus === TOLL_STATES.NO_TOLLS) guidance = "The provider did not detect toll roads on the selected route.";
-  $("#toll-guidance").textContent = [guidance, ...comparisons, ...warnings].filter(Boolean).join(" ");
-}
-
 function readCustomCosts() {
   return $$(".custom-cost-row").map((row) => ({ name: $(".custom-cost-name", row).value.trim(), amount: $(".custom-cost-amount", row).value }));
 }
 
 function rawJourneyValues() {
   const multiplier = value("trip-multiplier");
-  const route = state.routeSelection;
-  const durationSeconds = route
-    ? route.outbound.durationSeconds + (route.inbound?.durationSeconds || 0)
-    : parseNumber(value("manual-duration"), { field: "Duration" }) * 60 * parseNumber(multiplier || 1, { field: "Trip multiplier", min: .01, required: true });
-  const tollStatus = checked("manual-toll-override") ? TOLL_STATES.MANUAL_OVERRIDE : state.tollStatus;
+  const durationSeconds = parseNumber(value("manual-duration"), { field: "Duration" }) * 60 * parseNumber(multiplier || 1, { field: "Trip multiplier", min: .01, required: true });
   return {
-    oneWayDistance: value("one-way-distance"), returnDistance: route?.inbound?.distanceKm ?? null,
+    oneWayDistance: value("one-way-distance"),
     tripMultiplier: multiplier, additionalKilometres: value("additional-km"), passengerCount: value("passenger-count"),
     durationSeconds, energyType: value("energy-type"), fuelConsumption: value("fuel-consumption"),
     electricConsumption: value("electric-consumption"), fuelPrice: value("fuel-price"), electricityPrice: value("electricity-price"),
     outboundToll: value("outbound-toll"), returnToll: value("return-toll"), ferryCost: value("ferry-cost"),
     parkingCost: value("parking-cost"), maintenanceRate: value("maintenance-rate"), customCosts: readCustomCosts(),
-    currency: value("currency").trim().toUpperCase() || "EUR", tollStatus,
-    tollSource: checked("manual-toll-override") ? TOLL_LABELS[TOLL_STATES.MANUAL_OVERRIDE] : state.tollSource,
+    currency: value("currency").trim().toUpperCase() || "EUR",
   };
 }
 
@@ -598,11 +405,9 @@ function collectJourney() {
   const result = calculateJourney(raw);
   const journey = {
     name: value("journey-name").trim(), origin: value("origin").trim(), destination: value("destination").trim(),
-    stops: value("stops").split("\n").map((item) => item.trim()).filter(Boolean), mapSource: state.mapSource,
+    stops: value("stops").split("\n").map((item) => item.trim()).filter(Boolean),
     notes: value("journey-notes").trim(), vehicleId: value("vehicle-select"), vehicleName: value("vehicle-name").trim() || activeVehicle()?.name || "Custom vehicle",
     consumptionSource: value("consumption-source"), consumptionSourceLabel: consumptionSourceLabel(),
-    provider: state.routeSelection?.provider || "Manual mode", routeSelection: state.routeSelection ? structuredClone(state.routeSelection) : null,
-    tollSource: result.tollSource,
   };
   return { raw, result, journey };
 }
@@ -632,7 +437,7 @@ function renderResult(journey, result) {
   $("#result-passenger").textContent = formatCurrency(result.costPerPassenger, result.currency);
   $("#result-distance").textContent = `${formatNumber(result.totalDistance, 2)} km`;
   $("#result-breakdown").innerHTML = resultRows(result).map(([label, amount]) => `<div><dt>${escapeHtml(label)}</dt><dd>${formatCurrency(amount, result.currency)}</dd></div>`).join("");
-  $("#result-assumptions").textContent = `${formatDuration(result.durationSeconds)} · ${journey.vehicleName} · ${journey.consumptionSourceLabel} · ${result.tollSource} · ${result.passengerCount} passenger${result.passengerCount === 1 ? "" : "s"}. Values are estimates based on the entries shown.`;
+  $("#result-assumptions").textContent = `${formatDuration(result.durationSeconds)} · ${journey.vehicleName} · ${journey.consumptionSourceLabel} · ${result.passengerCount} passenger${result.passengerCount === 1 ? "" : "s"}. Values are estimates based only on the manual entries shown.`;
   ["save-journey", "recalculate-result", "duplicate-current", "copy-summary", "export-summary", "print-result"].forEach((id) => { $(`#${id}`).disabled = false; });
 }
 
@@ -698,12 +503,8 @@ function loadJourney(record, useCurrentVehicle = false) {
   safeValue("vehicle-name", journey.vehicleName || ""); safeValue("consumption-source", journey.consumptionSource || "manual");
   if (state.vehicles.some((vehicle) => vehicle.id === journey.vehicleId)) safeValue("vehicle-select", journey.vehicleId);
   populateCustomCosts(input.customCosts || []);
-  state.routeSelection = journey.routeSelection ? structuredClone(journey.routeSelection) : null;
-  state.tollStatus = input.tollStatus || TOLL_STATES.MANUAL;
-  state.tollSource = input.tollSource || TOLL_LABELS[state.tollStatus];
-  state.mapSource = journey.mapSource || "Manual entry";
   state.currentJourneyId = record.id;
-  updateEnergyFields(); updateTollDisplay();
+  updateEnergyFields();
   if (useCurrentVehicle && activeVehicle()) useVehicle(activeVehicle());
   calculateForm();
   $("#route-section").scrollIntoView({ behavior: "smooth" });
@@ -763,9 +564,8 @@ function resetCalculator(force = false) {
   safeValue("trip-multiplier", 1); safeValue("passenger-count", 1); safeValue("additional-km", 0); safeValue("maintenance-rate", 0);
   safeValue("outbound-toll", 0); safeValue("return-toll", 0); safeValue("ferry-cost", 0); safeValue("parking-cost", 0);
   populateCustomCosts();
-  state.currentResult = null; state.currentInput = null; state.currentJourneyId = null; state.routeSelection = null; state.routeChoices = [];
-  state.tollStatus = TOLL_STATES.UNKNOWN; state.tollSource = TOLL_LABELS[state.tollStatus];
-  $("#route-alternatives").innerHTML = ""; updateEnergyFields(); updateTollDisplay();
+  state.currentResult = null; state.currentInput = null; state.currentJourneyId = null;
+  updateEnergyFields();
   $("#result-total").textContent = "—"; $("#result-passenger").textContent = "—"; $("#result-distance").textContent = "—";
   $("#result-breakdown").innerHTML = "<div><dt>Energy</dt><dd>—</dd></div><div><dt>Tolls</dt><dd>—</dd></div><div><dt>Other costs</dt><dd>—</dd></div>";
   $("#result-assumptions").textContent = "Enter a route and vehicle values, then calculate.";
@@ -777,12 +577,8 @@ async function saveSettings(event) {
   try {
     const currency = value("currency").trim().toUpperCase();
     if (!/^[A-Z]{3}$/.test(currency)) throw new ValidationError("Currency must use a three-letter code such as EUR.");
-    const endpoint = value("provider-endpoint").trim();
-    if (endpoint) new ProxyRouteProvider(endpoint);
     storage.setSetting("currency", currency); storage.setSetting("theme", value("theme"));
-    storage.setSetting("routeCacheHours", parseNumber(value("route-cache-hours"), { field: "Route cache expiry", min: 1, required: true }));
-    storage.setSetting("providerEndpoint", endpoint);
-    updateCurrencyLabels(); applyTheme(value("theme")); updateProviderStatus();
+    updateCurrencyLabels(); applyTheme(value("theme"));
     message($("#settings-status"), "Settings saved on this browser.", "success");
   } catch (error) {
     message($("#settings-status"), error.message || "Settings could not be saved.", "error");
@@ -826,7 +622,7 @@ async function importBackup(mode) {
 }
 
 function exportVehiclesCsv() {
-  downloadFile("vehicle-cost-calculator-vehicles.csv", toCsv(state.vehicles, [["Name", "name"], ["Make", "make"], ["Model", "model"], ["Year", "year"], ["Energy type", "energyType"], ["Fuel consumption", "manualConsumption"], ["Electric consumption", "manualElectricConsumption"], ["Maintenance per km", "maintenanceRate"], ["Toll category", "tollCategory"], ["Archived", (row) => row.archived ? "yes" : "no"]]), "text/csv;charset=utf-8");
+  downloadFile("vehicle-cost-calculator-vehicles.csv", toCsv(state.vehicles, [["Name", "name"], ["Make", "make"], ["Model", "model"], ["Year", "year"], ["Energy type", "energyType"], ["Fuel consumption", "manualConsumption"], ["Electric consumption", "manualElectricConsumption"], ["Maintenance per km", "maintenanceRate"], ["Archived", (row) => row.archived ? "yes" : "no"]]), "text/csv;charset=utf-8");
 }
 
 function exportFillupsCsv() {
@@ -835,11 +631,11 @@ function exportFillupsCsv() {
 }
 
 function exportJourneysCsv() {
-  downloadFile("vehicle-cost-calculator-journeys.csv", toCsv(state.journeys, [["Date", "updatedAt"], ["Journey", "name"], ["Origin", "origin"], ["Destination", "destination"], ["Vehicle", "vehicleName"], ["Distance km", (row) => row.result?.totalDistance], ["Energy cost", (row) => row.result?.energyCost], ["Tolls", (row) => row.result?.totalTolls], ["Total", (row) => row.result?.totalCost], ["Passengers", (row) => row.result?.passengerCount], ["Per passenger", (row) => row.result?.costPerPassenger], ["Currency", (row) => row.result?.currency], ["Toll source", "tollSource"], ["Notes", "notes"]]), "text/csv;charset=utf-8");
+  downloadFile("vehicle-cost-calculator-journeys.csv", toCsv(state.journeys, [["Date", "updatedAt"], ["Journey", "name"], ["Origin", "origin"], ["Destination", "destination"], ["Vehicle", "vehicleName"], ["Distance km", (row) => row.result?.totalDistance], ["Energy cost", (row) => row.result?.energyCost], ["Tolls", (row) => row.result?.totalTolls], ["Total", (row) => row.result?.totalCost], ["Passengers", (row) => row.result?.passengerCount], ["Per passenger", (row) => row.result?.costPerPassenger], ["Currency", (row) => row.result?.currency], ["Notes", "notes"]]), "text/csv;charset=utf-8");
 }
 
 async function deleteAllData() {
-  const warning = "Delete all Vehicle Cost Calculator data from this browser? This removes vehicles, fill-ups, journeys, cached routes, price history, and preferences. Other EstrelaLua data and other websites are not affected. This cannot be undone unless you exported a backup.";
+  const warning = "Delete all Vehicle Cost Calculator data from this browser? This removes vehicles, fill-ups, journeys, price history, and preferences. Other EstrelaLua data and other websites are not affected. This cannot be undone unless you exported a backup.";
   if (!confirm(warning)) return;
   try {
     await storage.deleteAll();
@@ -854,30 +650,14 @@ async function deleteAllData() {
 async function loadSettings() {
   safeValue("currency", storage.getSetting("currency", "EUR"));
   safeValue("theme", storage.getSetting("theme", "light"));
-  safeValue("route-cache-hours", storage.getSetting("routeCacheHours", 12));
-  safeValue("provider-endpoint", storage.getSetting("providerEndpoint", ""));
-  applyTheme(value("theme")); updateCurrencyLabels(); updateProviderStatus();
+  applyTheme(value("theme")); updateCurrencyLabels();
 }
 
 function bindEvents() {
   $("#journey-form").addEventListener("submit", calculateForm);
-  $("#import-link").addEventListener("click", importMapLink);
-  $("#calculate-route").addEventListener("click", calculateOnlineRoute);
-  $("#route-alternatives").addEventListener("change", (event) => { if (event.target.name === "route-choice") applyRouteChoice(Number(event.target.value)); });
-  ["origin", "destination", "stops", "one-way-distance"].forEach((id) => $(`#${id}`).addEventListener("input", (event) => {
-    if (!event.isTrusted || !state.routeSelection) return;
-    const retainedTolls = num("outbound-toll") + num("return-toll");
-    state.tollStatus = retainedTolls > 0 ? TOLL_STATES.MANUAL : TOLL_STATES.UNKNOWN;
-    state.tollSource = retainedTolls > 0 ? "Manual value retained after route edit" : TOLL_LABELS[TOLL_STATES.UNKNOWN];
-    $("#manual-toll-override").checked = retainedTolls > 0;
-    state.routeSelection = null; state.routeChoices = []; $("#route-alternatives").innerHTML = "";
-    updateTollDisplay();
-    message($("#route-status"), "The route was edited. Recalculate online or continue with the new manual values.", "warning");
-  }));
   $$('input[name="journeyType"]').forEach((radio) => radio.addEventListener("change", () => {
     if (radio.checked && radio.value !== "custom") safeValue("trip-multiplier", radio.value === "return" ? 2 : 1);
     if (radio.checked && radio.value === "custom") $("#trip-multiplier").focus();
-    state.routeSelection = null; state.routeChoices = []; $("#route-alternatives").innerHTML = "";
   }));
   $("#energy-type").addEventListener("change", updateEnergyFields);
   $("#consumption-source").addEventListener("change", applyConsumptionSource);
@@ -892,10 +672,6 @@ function bindEvents() {
   $("#fillup-table").addEventListener("click", (event) => { const button = event.target.closest("[data-fillup-delete]"); if (button) deleteFillup(button.dataset.fillupDelete); });
   $("#add-custom-cost").addEventListener("click", () => addCustomCost());
   $("#custom-costs").addEventListener("click", (event) => { const button = event.target.closest(".remove-custom-cost"); if (button) button.closest(".custom-cost-row").remove(); });
-  $("#outbound-toll").addEventListener("input", () => { state.tollStatus = checked("manual-toll-override") ? TOLL_STATES.MANUAL_OVERRIDE : TOLL_STATES.MANUAL; state.tollSource = TOLL_LABELS[state.tollStatus]; updateTollDisplay(); });
-  $("#return-toll").addEventListener("input", () => { state.tollStatus = checked("manual-toll-override") ? TOLL_STATES.MANUAL_OVERRIDE : TOLL_STATES.MANUAL; state.tollSource = TOLL_LABELS[state.tollStatus]; updateTollDisplay(); });
-  $("#manual-toll-override").addEventListener("change", () => { state.tollStatus = checked("manual-toll-override") ? TOLL_STATES.MANUAL_OVERRIDE : TOLL_STATES.MANUAL; state.tollSource = TOLL_LABELS[state.tollStatus]; updateTollDisplay(); });
-  $("#mark-no-tolls").addEventListener("click", () => { safeValue("outbound-toll", 0); safeValue("return-toll", 0); state.tollStatus = TOLL_STATES.NO_TOLLS; state.tollSource = "Manually marked as no tolls"; $("#manual-toll-override").checked = false; updateTollDisplay(); });
   $("#save-journey").addEventListener("click", saveCurrentJourney);
   $("#recalculate-result").addEventListener("click", calculateForm);
   $("#duplicate-current").addEventListener("click", () => { if (!state.currentInput) return; safeValue("journey-name", `${value("journey-name") || "Journey"} copy`); state.currentJourneyId = null; calculateForm(); });
@@ -907,7 +683,6 @@ function bindEvents() {
   $("#settings-form").addEventListener("submit", saveSettings);
   $("#currency").addEventListener("input", updateCurrencyLabels);
   $("#theme").addEventListener("change", () => applyTheme(value("theme")));
-  $("#clear-route-cache").addEventListener("click", async () => { await storage.clearRouteCache(); message($("#settings-status"), "Local route cache cleared.", "success"); });
   $("#export-backup").addEventListener("click", exportBackup);
   $("#import-backup").addEventListener("change", (event) => prepareImport(event.target.files[0]));
   $$('[data-close-import]').forEach((button) => button.addEventListener("click", () => $("#import-dialog").close()));
@@ -917,7 +692,6 @@ function bindEvents() {
   $("#export-fillups-csv").addEventListener("click", exportFillupsCsv);
   $("#export-journeys-csv").addEventListener("click", exportJourneysCsv);
   $("#delete-all-data").addEventListener("click", deleteAllData);
-  window.addEventListener("online", updateProviderStatus); window.addEventListener("offline", updateProviderStatus);
 }
 
 async function initialise() {
@@ -933,7 +707,6 @@ async function initialise() {
     ["save-journey", "new-vehicle", "add-vehicle-library", "export-backup", "import-backup"].forEach((id) => { const element = $(`#${id}`); if (element) element.disabled = true; });
   }
   updateEnergyFields();
-  updateTollDisplay();
 }
 
 initialise();

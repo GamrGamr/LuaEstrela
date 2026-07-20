@@ -31,9 +31,9 @@
           <h1>Plan the route.<br /><em>Know the real cost.</em></h1>
           <p>Start with a distance, your vehicle&rsquo;s consumption, and an energy price. Add tolls and other costs only when you need them.</p>
         </div>
-        <div class="mode-card" aria-live="polite">
-          <span class="status-dot" id="provider-dot"></span>
-          <div><strong id="provider-mode">Manual mode</strong><small id="provider-description">No route provider configured. All manual calculations stay in this browser.</small></div>
+        <div class="mode-card">
+          <span class="status-dot"></span>
+          <div><strong>Manual &amp; private</strong><small>All calculations and saved data stay in this browser.</small></div>
         </div>
       </section>
 
@@ -53,16 +53,6 @@
           <details id="route-section" class="step-card" open>
             <summary><span>01</span><div><strong>Route</strong><small>Where are you going?</small></div></summary>
             <div class="step-content">
-              <div class="field full-field">
-                <label for="map-link">Shared map link <span class="optional">Optional</span></label>
-                <div class="input-action">
-                  <input id="map-link" name="mapLink" type="url" inputmode="url" placeholder="Paste a Google Maps, Apple Maps, or Waze link" autocomplete="off" />
-                  <button class="secondary-button" id="import-link" type="button">Import link</button>
-                </div>
-                <p class="field-help">Links are parsed safely without loading or executing their content. Short links may still need manual confirmation.</p>
-                <div id="link-feedback" class="inline-message" role="status" aria-live="polite"></div>
-              </div>
-
               <div class="field-grid two-columns">
                 <div class="field"><label for="origin">Origin</label><input id="origin" name="origin" type="text" maxlength="300" autocomplete="street-address" placeholder="Lisbon, Portugal" /></div>
                 <div class="field"><label for="destination">Destination</label><input id="destination" name="destination" type="text" maxlength="300" placeholder="Porto, Portugal" /></div>
@@ -72,18 +62,8 @@
                 <textarea id="stops" name="stops" rows="2" maxlength="1500" placeholder="Coimbra, Portugal"></textarea>
               </div>
 
-              <div class="online-route-box">
-                <div>
-                  <strong>Automatic route &amp; toll estimate</strong>
-                  <p id="online-privacy-note">Configure a secure proxy in Settings to enable this. Before an online request, origin, destination, stops, and route options are sent to the selected provider; saved vehicle history is not sent.</p>
-                </div>
-                <button class="secondary-button" id="calculate-route" type="button">Calculate route</button>
-              </div>
-              <div id="route-status" class="inline-message" role="status" aria-live="polite"></div>
-              <div id="route-alternatives" class="route-alternatives" aria-label="Route alternatives"></div>
-
               <fieldset>
-                <legend>Manual route details</legend>
+                <legend>Distance and duration</legend>
                 <div class="field-grid three-columns">
                   <div class="field"><label for="one-way-distance">One-way distance</label><div class="unit-input"><input id="one-way-distance" name="oneWayDistance" inputmode="decimal" required /><span>km</span></div></div>
                   <div class="field"><label for="manual-duration">One-way duration <span class="optional">Optional</span></label><div class="unit-input"><input id="manual-duration" name="manualDuration" inputmode="numeric" /><span>min</span></div></div>
@@ -130,28 +110,18 @@
                 <div class="field electric-field" hidden><label for="electricity-price">Electricity price</label><div class="unit-input"><input id="electricity-price" name="electricityPrice" inputmode="decimal" /><span id="electricity-price-unit">EUR/kWh</span></div></div>
                 <div class="field"><label for="maintenance-rate">Maintenance allowance</label><div class="unit-input"><input id="maintenance-rate" name="maintenanceRate" inputmode="decimal" value="0" /><span id="maintenance-unit">EUR/km</span></div></div>
               </div>
-              <details class="nested-details">
-                <summary>Vehicle information for toll estimates</summary>
-                <div class="field-grid three-columns">
-                  <div class="field"><label for="toll-category">Vehicle category</label><select id="toll-category"><option value="passenger-car">Passenger car</option><option value="motorcycle">Motorcycle</option><option value="van">Van</option><option value="other">Other</option></select></div>
-                  <div class="field"><label for="toll-preference">Toll payment</label><select id="toll-preference"><option value="standard">Cash/card where available</option><option value="transponder">Transponder/pass where available</option><option value="compare">Compare cash and transponder</option></select></div>
-                  <div class="field"><label for="avoid-tolls">Route preference</label><select id="avoid-tolls"><option value="false">Allow toll roads</option><option value="true">Prefer to avoid toll roads</option></select></div>
-                </div>
-                <p class="field-help">Vehicle categories, emissions, and passes affect prices only where the configured provider and local toll system support them.</p>
-              </details>
             </div>
           </details>
 
           <details id="costs-section" class="step-card">
             <summary><span>03</span><div><strong>Additional costs</strong><small>Tolls, ferry, parking, and anything else.</small></div></summary>
             <div class="step-content">
-              <div class="toll-heading"><div><strong>Tolls</strong><span id="toll-source-badge" class="source-badge">Toll status unknown</span></div><button class="text-button" id="mark-no-tolls" type="button">Mark as no tolls</button></div>
+              <div class="toll-heading"><div><strong>Tolls</strong><span>Enter any road charges for this journey.</span></div></div>
               <div class="field-grid two-columns">
                 <div class="field"><label for="outbound-toll">Outbound toll</label><div class="unit-input"><input id="outbound-toll" name="outboundToll" inputmode="decimal" value="0" /><span class="currency-unit">EUR</span></div></div>
                 <div class="field"><label for="return-toll">Return toll</label><div class="unit-input"><input id="return-toll" name="returnToll" inputmode="decimal" value="0" /><span class="currency-unit">EUR</span></div></div>
               </div>
-              <label class="check-row"><input id="manual-toll-override" type="checkbox" /> Use these values as a manual override of the provider estimate</label>
-              <p id="toll-guidance" class="field-help">No automatic toll value is available. Enter tolls manually or mark the route as having no tolls.</p>
+              <p class="field-help">Use zero when a direction has no tolls.</p>
               <div class="field-grid two-columns">
                 <div class="field"><label for="ferry-cost">Ferry</label><div class="unit-input"><input id="ferry-cost" name="ferryCost" inputmode="decimal" value="0" /><span class="currency-unit">EUR</span></div></div>
                 <div class="field"><label for="parking-cost">Parking</label><div class="unit-input"><input id="parking-cost" name="parkingCost" inputmode="decimal" value="0" /><span class="currency-unit">EUR</span></div></div>
@@ -242,16 +212,13 @@
             <div class="field-grid two-columns">
               <div class="field"><label for="currency">Currency</label><input id="currency" maxlength="3" value="EUR" pattern="[A-Za-z]{3}" /></div>
               <div class="field"><label for="theme">Theme</label><select id="theme"><option value="light">Light</option><option value="dark">Dark</option><option value="system">System</option></select></div>
-              <div class="field"><label for="route-cache-hours">Route cache expiry</label><div class="unit-input"><input id="route-cache-hours" type="number" min="1" max="168" value="12" /><span>hours</span></div></div>
             </div>
-            <div class="field"><label for="provider-endpoint">Secure route proxy URL <span class="optional">Optional</span></label><input id="provider-endpoint" type="url" inputmode="url" placeholder="https://your-worker.workers.dev/" /></div>
-            <p class="field-help">Never paste a HERE or other private API key here. This field accepts only the public HTTPS URL of your deployed secure proxy.</p>
-            <div class="button-row"><button class="primary-button" type="submit">Save settings</button><button class="secondary-button" id="clear-route-cache" type="button">Clear route cache</button></div>
+            <div class="button-row"><button class="primary-button" type="submit">Save settings</button></div>
             <div id="settings-status" class="inline-message" role="status" aria-live="polite"></div>
           </form>
           <div class="data-card">
             <h3>Backup &amp; export</h3>
-            <p>Backups include calculator vehicles, fill-ups, journeys, route cache, price history, and preferences. Imported files are validated before anything changes.</p>
+            <p>Backups include calculator vehicles, fill-ups, journeys, price history, and preferences. Imported files are validated before anything changes.</p>
             <div class="data-actions">
               <button class="secondary-button" id="export-backup" type="button">Export JSON backup</button>
               <label class="file-button">Import JSON backup<input id="import-backup" type="file" accept="application/json,.json" /></label>
@@ -271,7 +238,7 @@
         <div><p class="kicker">Privacy</p><h2 id="privacy-title">Your journey data belongs to you.</h2></div>
         <div>
           <p>Manual calculations, vehicles, fill-ups, and saved journeys remain in this browser. There are no accounts, analytics, telemetry, advertising, or cloud synchronisation. Clearing browser storage may remove saved information, so export a backup when it matters.</p>
-          <p>When automatic routing is enabled, the calculator visibly warns you before sending origin, destination, stops, and route options to the configured provider. Vehicle history and saved journeys are not sent. The proxy is designed not to retain journey data, while the provider&rsquo;s own privacy terms still apply.</p>
+          <p>The calculator does not contact mapping, routing, toll, analytics, or cloud services. Enter route details and prices yourself, then export a backup if you want a copy outside this browser.</p>
         </div>
       </section>
     </main>
@@ -293,13 +260,8 @@
             <div class="field"><label for="profile-electric-consumption">Manual electric consumption</label><input id="profile-electric-consumption" inputmode="decimal" /></div>
             <div class="field"><label for="profile-preferred-source">Preferred consumption source</label><select id="profile-preferred-source"><option value="manual">Manual</option><option value="latest">Latest measured</option><option value="latest-three">Latest-three measured</option><option value="overall">Overall measured</option><option value="city">City measured</option><option value="motorway">Motorway measured</option><option value="mixed">Mixed measured</option></select></div>
             <div class="field"><label for="profile-maintenance">Maintenance cost per km</label><input id="profile-maintenance" inputmode="decimal" /></div>
-            <div class="field"><label for="profile-toll-category">Toll category</label><select id="profile-toll-category"><option value="passenger-car">Passenger car</option><option value="motorcycle">Motorcycle</option><option value="van">Van</option><option value="other">Other</option></select></div>
-            <div class="field"><label for="profile-country">Registration country</label><input id="profile-country" maxlength="60" /></div>
-            <div class="field"><label for="profile-emissions">Emissions category</label><input id="profile-emissions" maxlength="60" placeholder="Euro 6" /></div>
-            <div class="field"><label for="profile-axles">Number of axles</label><input id="profile-axles" type="number" min="1" max="10" value="2" /></div>
             <div class="field"><label for="profile-passengers">Default passengers</label><input id="profile-passengers" type="number" min="1" step="1" value="1" /></div>
           </div>
-          <div class="field"><label for="profile-toll-passes">Toll passes or transponders <span class="optional">Comma separated</span></label><input id="profile-toll-passes" maxlength="300" /></div>
           <div class="field"><label for="profile-notes">Notes</label><textarea id="profile-notes" rows="3" maxlength="2000"></textarea></div>
           <label class="check-row"><input id="profile-archived" type="checkbox" /> Archive this vehicle</label>
         </div>
