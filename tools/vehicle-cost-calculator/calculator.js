@@ -12,7 +12,7 @@ import {
   parseNumber,
   sanitiseDecimalInput,
   sanitiseIntegerInput,
-} from "./calculations.js?v=8";
+} from "./calculations.js?v=9";
 import { CalculatorStorage, StorageError } from "./storage.js?v=6";
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -787,6 +787,26 @@ function bindEvents() {
   $("#export-fillups-csv").addEventListener("click", exportFillupsCsv);
   $("#export-journeys-csv").addEventListener("click", exportJourneysCsv);
   $("#delete-all-data").addEventListener("click", deleteAllData);
+  document.addEventListener("beforeinput", (event) => {
+    if (!(event.target instanceof HTMLInputElement) || !event.inputType.startsWith("insert") || event.data === null) return;
+
+    if (event.target.matches('input[inputmode="numeric"]')) {
+      if (/\D/.test(event.data)) event.preventDefault();
+      return;
+    }
+
+    const sanitise = event.target.matches('input[inputmode="decimal"]')
+      ? sanitiseDecimalInput
+      : event.target.matches('input[type="number"]')
+        ? sanitiseIntegerInput
+        : null;
+    if (!sanitise) return;
+
+    const selectionStart = event.target.selectionStart ?? event.target.value.length;
+    const selectionEnd = event.target.selectionEnd ?? selectionStart;
+    const nextValue = `${event.target.value.slice(0, selectionStart)}${event.data}${event.target.value.slice(selectionEnd)}`;
+    if (sanitise(nextValue) !== nextValue) event.preventDefault();
+  });
   document.addEventListener("input", (event) => {
     if (!(event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement)) return;
     if (event.target.matches('input[inputmode="decimal"]')) event.target.value = sanitiseDecimalInput(event.target.value);
