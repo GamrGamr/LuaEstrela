@@ -8,8 +8,8 @@ import {
   formatNumber,
   makeId,
   parseNumber,
-} from "./calculations.js";
-import { CalculatorStorage, StorageError } from "./storage.js";
+} from "./calculations.js?v=4";
+import { CalculatorStorage, StorageError } from "./storage.js?v=4";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];

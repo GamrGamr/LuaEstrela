@@ -1,5 +1,5 @@
-import { ValidationError, calculateFillUpConsumption, calculateJourney, formatCurrency } from "./calculations.js";
-import { CalculatorStorage } from "./storage.js";
+import { ValidationError, calculateFillUpConsumption, calculateJourney, formatCurrency } from "./calculations.js?v=4";
+import { CalculatorStorage } from "./storage.js?v=4";
 
 const results = [];
 const base = { oneWayDistance: 100, tripMultiplier: 1, passengerCount: 1, energyType: "petrol", fuelConsumption: 6, fuelPrice: 2, currency: "EUR" };
