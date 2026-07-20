@@ -90,8 +90,9 @@ input, select, textarea { width: 100%; min-height: 46px; padding: 11px 13px; col
 textarea { resize: vertical; }
 input:hover, select:hover, textarea:hover { border-color: #9fc8c4; }
 input:focus, select:focus, textarea:focus { border-color: var(--ocean); box-shadow: 0 0 0 4px rgba(8,125,175,.12); outline: none; }
-input[aria-invalid="true"], select[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(169,54,43,.12); }
+input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(169,54,43,.12); }
 .field-help { margin: 7px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.field-error { margin: 7px 0 0; color: var(--danger); font-size: 11px; font-weight: 750; line-height: 1.45; }
 .unit-input { position: relative; }
 .unit-input input { padding-right: 85px; }
 .unit-input span { position: absolute; right: 12px; top: 50%; max-width: 75px; overflow: hidden; transform: translateY(-50%); color: var(--muted); font-size: 10px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }

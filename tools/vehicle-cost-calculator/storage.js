@@ -1,10 +1,10 @@
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 export const DATABASE_NAME = "estrela-lua-vehicle-cost-calculator";
 export const BACKUP_VERSION = 1;
 export const STORE_NAMES = ["vehicles", "fillups", "journeys", "fuelPrices"];
 
 const REMOVED_VEHICLE_FIELDS = ["tollCategory", "registrationCountry", "emissionsCategory", "axleCount", "tollPasses"];
-const REMOVED_JOURNEY_FIELDS = ["mapSource", "provider", "routeSelection", "tollSource"];
+const REMOVED_JOURNEY_FIELDS = ["mapSource", "provider", "routeSelection", "tollSource", "origin", "destination", "stops"];
 
 function sanitiseRecord(storeName, record) {
   const copy = structuredClone(record);

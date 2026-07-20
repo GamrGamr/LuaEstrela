@@ -1,50 +1,63 @@
 export class ValidationError extends Error {
-  constructor(message, field = "") {
+  constructor(message, field = "", fieldId = "") {
     super(message);
     this.name = "ValidationError";
     this.field = field;
+    this.fieldId = fieldId;
   }
 }
 
 export const ENERGY_TYPES = ["petrol", "diesel", "lpg", "hybrid", "plug-in-hybrid", "electric"];
 
-export function parseNumber(value, { field = "Value", min = 0, required = false } = {}) {
+export function parseNumber(value, { field = "Value", fieldId = "", min = 0, max = Number.MAX_SAFE_INTEGER, required = false, integer = false } = {}) {
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new ValidationError(`${field} must be a valid number.`, field);
-    if (value < min) throw new ValidationError(`${field} cannot be lower than ${min}.`, field);
+    if (!Number.isFinite(value)) throw new ValidationError(`${field} must be a valid number.`, field, fieldId);
+    if (value < min) throw new ValidationError(`${field} must be at least ${min}.`, field, fieldId);
+    if (value > max) throw new ValidationError(`${field} cannot be greater than ${max}.`, field, fieldId);
+    if (integer && !Number.isInteger(value)) throw new ValidationError(`${field} must be a whole number.`, field, fieldId);
     return value;
   }
 
   let text = String(value ?? "").trim().replace(/\s/g, "");
   if (!text) {
-    if (required) throw new ValidationError(`${field} is required.`, field);
+    if (required) throw new ValidationError(`${field} is required.`, field, fieldId);
     return 0;
   }
 
   const comma = text.lastIndexOf(",");
   const dot = text.lastIndexOf(".");
   if (comma >= 0 && dot >= 0) {
-    text = comma > dot ? text.replace(/\./g, "").replace(",", ".") : text.replace(/,/g, "");
+    const decimalSeparator = comma > dot ? "," : ".";
+    const thousandsSeparator = decimalSeparator === "," ? "." : ",";
+    const [integerPart, decimalPart = ""] = text.split(decimalSeparator);
+    const groupedNumber = new RegExp(`^[+-]?\\d{1,3}(?:\\${thousandsSeparator}\\d{3})+$`);
+    if (!groupedNumber.test(integerPart) || !/^\d+$/.test(decimalPart)) {
+      throw new ValidationError(`${field} must be a valid number.`, field, fieldId);
+    }
+    text = `${integerPart.replaceAll(thousandsSeparator, "")}.${decimalPart}`;
   } else if (comma >= 0) {
+    if ((text.match(/,/g) || []).length > 1) throw new ValidationError(`${field} must be a valid number.`, field, fieldId);
     text = text.replace(",", ".");
   }
 
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) throw new ValidationError(`${field} must be a valid number.`, field, fieldId);
   const number = Number(text);
-  if (!Number.isFinite(number)) throw new ValidationError(`${field} must be a valid number.`, field);
-  if (number < min) throw new ValidationError(`${field} cannot be lower than ${min}.`, field);
+  if (!Number.isFinite(number)) throw new ValidationError(`${field} must be a valid number.`, field, fieldId);
+  if (number < min) throw new ValidationError(`${field} must be at least ${min}.`, field, fieldId);
+  if (number > max) throw new ValidationError(`${field} cannot be greater than ${max}.`, field, fieldId);
+  if (integer && !Number.isInteger(number)) throw new ValidationError(`${field} must be a whole number.`, field, fieldId);
   return number;
 }
 
 export function calculateJourney(input = {}) {
   const energyType = ENERGY_TYPES.includes(input.energyType) ? input.energyType : "petrol";
-  const oneWayDistance = parseNumber(input.oneWayDistance, { field: "One-way distance", required: true });
-  const tripMultiplier = parseNumber(input.tripMultiplier ?? 1, { field: "Trip multiplier", min: 0.01, required: true });
-  const additionalKilometres = parseNumber(input.additionalKilometres, { field: "Additional kilometres" });
-  const passengerCount = parseNumber(input.passengerCount ?? 1, { field: "Passenger count", min: 1, required: true });
-  if (!Number.isInteger(passengerCount)) throw new ValidationError("Passenger count must be a whole number.", "Passenger count");
+  const oneWayDistance = parseNumber(input.oneWayDistance, { field: "One-way distance", fieldId: "one-way-distance", min: 0.01, max: 1_000_000, required: true });
+  const tripMultiplier = parseNumber(input.tripMultiplier ?? 1, { field: "Trip multiplier", fieldId: "trip-multiplier", min: 0.01, max: 1_000, required: true });
+  const additionalKilometres = parseNumber(input.additionalKilometres, { field: "Additional distance", fieldId: "additional-km", max: 1_000_000 });
+  const passengerCount = parseNumber(input.passengerCount ?? 1, { field: "Passenger count", fieldId: "passenger-count", min: 1, max: 100_000, required: true, integer: true });
 
   const totalDistance = oneWayDistance * tripMultiplier + additionalKilometres;
-  if (!(totalDistance > 0)) throw new ValidationError("Total distance must be greater than zero.", "Total distance");
+  if (!(totalDistance > 0)) throw new ValidationError("Total distance must be greater than zero.", "Total distance", "one-way-distance");
 
   let fuelConsumption = 0;
   let electricConsumption = 0;
@@ -52,19 +65,19 @@ export function calculateJourney(input = {}) {
   let electricityPrice = 0;
 
   if (energyType === "electric") {
-    electricConsumption = parseNumber(input.electricConsumption ?? input.consumption, { field: "Electricity consumption", min: 0.01, required: true });
-    electricityPrice = parseNumber(input.electricityPrice ?? input.energyPrice, { field: "Electricity price", required: true });
+    electricConsumption = parseNumber(input.electricConsumption ?? input.consumption, { field: "Electricity consumption", fieldId: "electric-consumption", min: 0.01, max: 10_000, required: true });
+    electricityPrice = parseNumber(input.electricityPrice ?? input.energyPrice, { field: "Electricity price", fieldId: "electricity-price", max: 1_000_000_000, required: true });
   } else if (energyType === "plug-in-hybrid") {
-    fuelConsumption = parseNumber(input.fuelConsumption ?? input.consumption, { field: "Fuel consumption" });
-    electricConsumption = parseNumber(input.electricConsumption, { field: "Electricity consumption" });
-    fuelPrice = parseNumber(input.fuelPrice ?? input.energyPrice, { field: "Fuel price" });
-    electricityPrice = parseNumber(input.electricityPrice, { field: "Electricity price" });
+    fuelConsumption = parseNumber(input.fuelConsumption ?? input.consumption, { field: "Fuel consumption", fieldId: "fuel-consumption", max: 10_000 });
+    electricConsumption = parseNumber(input.electricConsumption, { field: "Electricity consumption", fieldId: "electric-consumption", max: 10_000 });
     if (!(fuelConsumption > 0 || electricConsumption > 0)) {
-      throw new ValidationError("Enter fuel consumption, electricity consumption, or both.", "Consumption");
+      throw new ValidationError("Enter fuel consumption, electricity consumption, or both.", "Consumption", "fuel-consumption");
     }
+    fuelPrice = parseNumber(input.fuelPrice ?? input.energyPrice, { field: "Fuel price", fieldId: "fuel-price", max: 1_000_000_000, required: fuelConsumption > 0 });
+    electricityPrice = parseNumber(input.electricityPrice, { field: "Electricity price", fieldId: "electricity-price", max: 1_000_000_000, required: electricConsumption > 0 });
   } else {
-    fuelConsumption = parseNumber(input.fuelConsumption ?? input.consumption, { field: "Fuel consumption", min: 0.01, required: true });
-    fuelPrice = parseNumber(input.fuelPrice ?? input.energyPrice, { field: "Fuel price", required: true });
+    fuelConsumption = parseNumber(input.fuelConsumption ?? input.consumption, { field: "Fuel consumption", fieldId: "fuel-consumption", min: 0.01, max: 10_000, required: true });
+    fuelPrice = parseNumber(input.fuelPrice ?? input.energyPrice, { field: "Fuel price", fieldId: "fuel-price", max: 1_000_000_000, required: true });
   }
 
   const fuelQuantity = totalDistance * fuelConsumption / 100;
@@ -73,15 +86,15 @@ export function calculateJourney(input = {}) {
   const electricityCost = electricQuantity * electricityPrice;
   const energyCost = fuelCost + electricityCost;
 
-  const outboundToll = parseNumber(input.outboundToll, { field: "Outbound toll" });
-  const returnToll = parseNumber(input.returnToll, { field: "Return toll" });
-  const ferryCost = parseNumber(input.ferryCost, { field: "Ferry cost" });
-  const parkingCost = parseNumber(input.parkingCost, { field: "Parking cost" });
-  const maintenanceRate = parseNumber(input.maintenanceRate, { field: "Maintenance cost per kilometre" });
+  const outboundToll = parseNumber(input.outboundToll, { field: "Outbound toll", fieldId: "outbound-toll", max: 1_000_000_000 });
+  const returnToll = parseNumber(input.returnToll, { field: "Return toll", fieldId: "return-toll", max: 1_000_000_000 });
+  const ferryCost = parseNumber(input.ferryCost, { field: "Ferry cost", fieldId: "ferry-cost", max: 1_000_000_000 });
+  const parkingCost = parseNumber(input.parkingCost, { field: "Parking cost", fieldId: "parking-cost", max: 1_000_000_000 });
+  const maintenanceRate = parseNumber(input.maintenanceRate, { field: "Maintenance cost per kilometre", fieldId: "maintenance-rate", max: 1_000_000 });
   const maintenanceCost = totalDistance * maintenanceRate;
   const customCosts = (Array.isArray(input.customCosts) ? input.customCosts : []).map((item, index) => ({
     name: String(item?.name || `Additional cost ${index + 1}`).trim(),
-    amount: parseNumber(item?.amount, { field: item?.name || `Additional cost ${index + 1}` }),
+    amount: parseNumber(item?.amount, { field: item?.name || `Additional cost ${index + 1}`, fieldId: item?.fieldId || "", max: 1_000_000_000 }),
   })).filter((item) => item.amount > 0);
   const customCostTotal = customCosts.reduce((sum, item) => sum + item.amount, 0);
   const totalTolls = outboundToll + returnToll;
@@ -92,7 +105,7 @@ export function calculateJourney(input = {}) {
     tripMultiplier,
     additionalKilometres,
     totalDistance,
-    durationSeconds: parseNumber(input.durationSeconds, { field: "Duration" }),
+    durationSeconds: parseNumber(input.durationSeconds, { field: "Duration", fieldId: "manual-duration", max: 31_536_000_000 }),
     energyType,
     fuelConsumption,
     electricConsumption,
@@ -234,7 +247,7 @@ export function buildJourneySummary(journey, result) {
   const lines = [
     "Vehicle Cost Calculator",
     "",
-    `Journey: ${journey.name || [journey.origin, journey.destination].filter(Boolean).join(" to ") || "Untitled journey"}`,
+    `Journey: ${journey.name || "Untitled journey"}`,
     `Journey type: ${result.tripMultiplier === 2 ? "Return" : result.tripMultiplier === 1 ? "One-way" : `Multiplier ${result.tripMultiplier}`}`,
     `Distance: ${formatNumber(result.totalDistance, 2)} km`,
     `Duration: ${formatDuration(result.durationSeconds)}`,

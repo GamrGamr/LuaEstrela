@@ -8,8 +8,8 @@ import {
   formatNumber,
   makeId,
   parseNumber,
-} from "./calculations.js?v=4";
-import { CalculatorStorage, StorageError } from "./storage.js?v=4";
+} from "./calculations.js?v=5";
+import { CalculatorStorage, StorageError } from "./storage.js?v=5";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -32,6 +32,65 @@ function escapeHtml(value) {
 function message(element, text = "", type = "") {
   element.textContent = text;
   element.className = `inline-message${type ? ` ${type}` : ""}`;
+}
+
+function clearFieldError(element) {
+  if (!element) return;
+  element.removeAttribute("aria-invalid");
+  const errorId = `${element.id}-error`;
+  element.closest(".field")?.querySelector(`#${CSS.escape(errorId)}`)?.remove();
+  const describedBy = (element.getAttribute("aria-describedby") || "").split(/\s+/).filter((id) => id && id !== errorId);
+  if (describedBy.length) element.setAttribute("aria-describedby", describedBy.join(" "));
+  else element.removeAttribute("aria-describedby");
+}
+
+function clearValidation(scope) {
+  $$('[aria-invalid="true"]', scope).forEach(clearFieldError);
+  $$(".field-error", scope).forEach((element) => element.remove());
+}
+
+function nativeValidationError(form) {
+  const element = [...form.elements].find((control) => control.willValidate && !control.validity.valid && !control.closest("[hidden]"));
+  if (!element) return null;
+  const label = form.querySelector(`label[for="${CSS.escape(element.id)}"]`)?.childNodes[0]?.textContent?.trim() || "This field";
+  let text = `${label} contains an invalid value.`;
+  if (element.validity.valueMissing) text = `${label} is required.`;
+  else if (element.validity.tooLong) text = `${label} is too long.`;
+  else if (element.validity.rangeUnderflow) text = `${label} must be at least ${element.min}.`;
+  else if (element.validity.rangeOverflow) text = `${label} cannot be greater than ${element.max}.`;
+  else if (element.validity.stepMismatch) text = `${label} must be a whole number.`;
+  else if (element.validity.patternMismatch) text = `${label} must use the requested format.`;
+  return new ValidationError(text, label, element.id);
+}
+
+function showValidationError(error, { form, status, summary } = {}) {
+  const text = error instanceof ValidationError ? error.message : "Check the values and try again.";
+  if (status) message(status, text, "error");
+  if (summary) {
+    summary.textContent = text;
+    summary.hidden = false;
+  }
+  const element = error instanceof ValidationError && error.fieldId ? document.getElementById(error.fieldId) : null;
+  if (!element || (form && !form.contains(element))) return;
+  clearFieldError(element);
+  element.setAttribute("aria-invalid", "true");
+  const errorMessage = document.createElement("p");
+  errorMessage.id = `${element.id}-error`;
+  errorMessage.className = "field-error";
+  errorMessage.textContent = text;
+  element.closest(".field")?.append(errorMessage);
+  const describedBy = new Set((element.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean));
+  describedBy.add(errorMessage.id);
+  element.setAttribute("aria-describedby", [...describedBy].join(" "));
+  const details = element.closest("details");
+  if (details) details.open = true;
+  element.focus({ preventScroll: true });
+  element.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function requireNativeValidity(form) {
+  const error = nativeValidationError(form);
+  if (error) throw error;
 }
 
 function safeValue(id, value = "") {
@@ -184,6 +243,16 @@ function updateEnergyFields() {
   const showElectric = energy === "electric" || energy === "plug-in-hybrid";
   $$(".fuel-field").forEach((field) => { field.hidden = !showFuel; });
   $$(".electric-field").forEach((field) => { field.hidden = !showElectric; });
+  const fuelRequired = showFuel && energy !== "plug-in-hybrid";
+  const electricRequired = energy === "electric";
+  [$("#fuel-consumption"), $("#fuel-price")].forEach((element) => {
+    element.required = fuelRequired;
+    element.setAttribute("aria-required", String(fuelRequired));
+  });
+  [$("#electric-consumption"), $("#electricity-price")].forEach((element) => {
+    element.required = electricRequired;
+    element.setAttribute("aria-required", String(electricRequired));
+  });
   if (energy === "electric" && value("consumption-source") !== "manual") {
     $("#consumption-source").value = "manual";
     message($("#consumption-feedback"), "Fill-up measurement applies to liquid fuel. Enter electric consumption manually.");
@@ -218,22 +287,22 @@ function useVehicle(vehicle) {
 
 function profileFromForm(existing = null) {
   const name = value("profile-name").trim();
-  if (!name) throw new ValidationError("Vehicle name is required.", "Vehicle name");
+  if (!name) throw new ValidationError("Vehicle name is required.", "Vehicle name", "profile-name");
   const energyType = value("profile-energy");
   return {
     id: value("profile-id") || makeId("vehicle"),
     name,
     make: value("profile-make").trim(),
     model: value("profile-model").trim(),
-    year: value("profile-year") ? parseNumber(value("profile-year"), { field: "Year", min: 1900 }) : "",
+    year: value("profile-year") ? parseNumber(value("profile-year"), { field: "Year", fieldId: "profile-year", min: 1900, max: 2100, integer: true }) : "",
     engineDescription: value("profile-engine").trim(),
     registration: value("profile-registration").trim(),
     energyType,
-    manualConsumption: parseNumber(value("profile-consumption"), { field: "Manual fuel consumption" }),
-    manualElectricConsumption: parseNumber(value("profile-electric-consumption"), { field: "Manual electric consumption" }),
+    manualConsumption: parseNumber(value("profile-consumption"), { field: "Manual fuel consumption", fieldId: "profile-consumption", max: 10_000 }),
+    manualElectricConsumption: parseNumber(value("profile-electric-consumption"), { field: "Manual electric consumption", fieldId: "profile-electric-consumption", max: 10_000 }),
     preferredConsumptionSource: value("profile-preferred-source"),
-    maintenanceRate: parseNumber(value("profile-maintenance"), { field: "Maintenance cost per kilometre" }),
-    defaultPassengerCount: parseNumber(value("profile-passengers") || 1, { field: "Default passengers", min: 1, required: true }),
+    maintenanceRate: parseNumber(value("profile-maintenance"), { field: "Maintenance cost per kilometre", fieldId: "profile-maintenance", max: 1_000_000 }),
+    defaultPassengerCount: parseNumber(value("profile-passengers") || 1, { field: "Default passengers", fieldId: "profile-passengers", min: 1, max: 100_000, required: true, integer: true }),
     notes: value("profile-notes").trim(),
     archived: checked("profile-archived"),
     createdAt: existing?.createdAt || new Date().toISOString(),
@@ -266,7 +335,10 @@ function openVehicleDialog(vehicle = null, duplicate = false) {
 
 async function saveVehicle(event) {
   event.preventDefault();
+  clearValidation(event.currentTarget);
+  message($("#vehicle-form-status"));
   try {
+    requireNativeValidity(event.currentTarget);
     const existing = state.vehicles.find((vehicle) => vehicle.id === value("profile-id"));
     const profile = profileFromForm(existing);
     await storage.put("vehicles", profile);
@@ -275,7 +347,7 @@ async function saveVehicle(event) {
     useVehicle(profile);
     message($("#action-status"), `Saved ${profile.name}.`, "success");
   } catch (error) {
-    message($("#vehicle-form-status"), error.message || "The vehicle could not be saved.", "error");
+    showValidationError(error, { form: event.currentTarget, status: $("#vehicle-form-status") });
   }
 }
 
@@ -344,17 +416,20 @@ function renderConsumptionStats(vehicleId) {
 
 async function saveFillup(event) {
   event.preventDefault();
+  clearValidation(event.currentTarget);
+  message($("#fillup-status"));
   try {
+    requireNativeValidity(event.currentTarget);
     const vehicleId = value("fillup-vehicle");
-    if (!vehicleId) throw new ValidationError("Choose a saved vehicle.");
-    const odometer = parseNumber(value("fillup-odometer"), { field: "Odometer" });
-    const tripDistance = parseNumber(value("fillup-trip-distance"), { field: "Trip distance" });
-    if (!(odometer > 0 || tripDistance > 0)) throw new ValidationError("Enter an odometer reading or trip distance.");
-    const litres = parseNumber(value("fillup-litres"), { field: "Litres added", min: 0.01, required: true });
-    const pricePerLitre = parseNumber(value("fillup-price"), { field: "Price per litre" });
+    if (!vehicleId) throw new ValidationError("Choose a saved vehicle.", "Vehicle", "fillup-vehicle");
+    const odometer = parseNumber(value("fillup-odometer"), { field: "Odometer", fieldId: "fillup-odometer", max: 100_000_000 });
+    const tripDistance = parseNumber(value("fillup-trip-distance"), { field: "Trip distance", fieldId: "fillup-trip-distance", max: 1_000_000 });
+    if (!(odometer > 0 || tripDistance > 0)) throw new ValidationError("Enter an odometer reading or trip distance greater than zero.", "Odometer or trip distance", "fillup-odometer");
+    const litres = parseNumber(value("fillup-litres"), { field: "Litres added", fieldId: "fillup-litres", min: 0.01, max: 100_000, required: true });
+    const pricePerLitre = parseNumber(value("fillup-price"), { field: "Price per litre", fieldId: "fillup-price", max: 1_000_000 });
     const record = {
       id: makeId("fillup"), vehicleId, date: value("fillup-date") || isoDate(), odometer, tripDistance, litres,
-      pricePerLitre, totalPaid: parseNumber(value("fillup-total"), { field: "Total paid" }) || litres * pricePerLitre,
+      pricePerLitre, totalPaid: parseNumber(value("fillup-total"), { field: "Total paid", fieldId: "fillup-total", max: 1_000_000_000 }) || litres * pricePerLitre,
       fullTank: checked("fillup-full"), fuelType: value("fillup-fuel-type"), drivingType: value("fillup-driving"),
       notes: value("fillup-notes").trim(), createdAt: new Date().toISOString(),
     };
@@ -367,7 +442,7 @@ async function saveFillup(event) {
     renderConsumptionStats(selectedVehicle);
     message($("#fillup-status"), "Fill-up saved locally.", "success");
   } catch (error) {
-    message($("#fillup-status"), error.message || "The fill-up could not be saved.", "error");
+    showValidationError(error, { form: event.currentTarget, status: $("#fillup-status") });
   }
 }
 
@@ -379,12 +454,16 @@ async function deleteFillup(id) {
 }
 
 function readCustomCosts() {
-  return $$(".custom-cost-row").map((row) => ({ name: $(".custom-cost-name", row).value.trim(), amount: $(".custom-cost-amount", row).value }));
+  return $$(".custom-cost-row").map((row) => ({
+    name: $(".custom-cost-name", row).value.trim(),
+    amount: $(".custom-cost-amount", row).value,
+    fieldId: $(".custom-cost-amount", row).id,
+  }));
 }
 
 function rawJourneyValues() {
   const multiplier = value("trip-multiplier");
-  const durationSeconds = parseNumber(value("manual-duration"), { field: "Duration" }) * 60 * parseNumber(multiplier || 1, { field: "Trip multiplier", min: .01, required: true });
+  const durationSeconds = parseNumber(value("manual-duration"), { field: "Duration", fieldId: "manual-duration", max: 1_000_000 }) * 60 * parseNumber(multiplier || 1, { field: "Trip multiplier", fieldId: "trip-multiplier", min: .01, max: 1_000, required: true });
   return {
     oneWayDistance: value("one-way-distance"),
     tripMultiplier: multiplier, additionalKilometres: value("additional-km"), passengerCount: value("passenger-count"),
@@ -403,10 +482,9 @@ function consumptionSourceLabel() {
 function collectJourney() {
   const raw = rawJourneyValues();
   const result = calculateJourney(raw);
+  raw.customCosts = result.customCosts.map(({ name, amount }) => ({ name, amount }));
   const journey = {
-    name: value("journey-name").trim(), origin: value("origin").trim(), destination: value("destination").trim(),
-    stops: value("stops").split("\n").map((item) => item.trim()).filter(Boolean),
-    notes: value("journey-notes").trim(), vehicleId: value("vehicle-select"), vehicleName: value("vehicle-name").trim() || activeVehicle()?.name || "Custom vehicle",
+    name: value("journey-name").trim(), notes: value("journey-notes").trim(), vehicleId: value("vehicle-select"), vehicleName: value("vehicle-name").trim() || activeVehicle()?.name || "Custom vehicle",
     consumptionSource: value("consumption-source"), consumptionSourceLabel: consumptionSourceLabel(),
   };
   return { raw, result, journey };
@@ -443,9 +521,10 @@ function renderResult(journey, result) {
 
 async function calculateForm(event) {
   event?.preventDefault();
+  clearValidation($("#journey-form"));
   $("#form-errors").hidden = true;
-  $$('[aria-invalid="true"]').forEach((element) => element.removeAttribute("aria-invalid"));
   try {
+    requireNativeValidity($("#journey-form"));
     const { raw, result, journey } = collectJourney();
     state.currentInput = { raw: structuredClone(raw), journey: structuredClone(journey) };
     state.currentResult = result;
@@ -454,10 +533,8 @@ async function calculateForm(event) {
     message($("#action-status"), "Journey recalculated. Save it if you want to keep this snapshot.", "success");
     if (matchMedia("(max-width: 820px)").matches) $("#results-section").scrollIntoView({ behavior: "smooth" });
   } catch (error) {
-    const text = error instanceof ValidationError ? error.message : "The calculation could not be completed. Check the values and try again.";
-    $("#form-errors").textContent = text;
-    $("#form-errors").hidden = false;
-    $("#form-errors").scrollIntoView({ behavior: "smooth", block: "center" });
+    showValidationError(error, { form: $("#journey-form"), summary: $("#form-errors") });
+    if (!(error instanceof ValidationError) || !error.fieldId) $("#form-errors").scrollIntoView({ behavior: "smooth", block: "center" });
   }
 }
 
@@ -484,6 +561,7 @@ function addCustomCost(item = {}) {
   const fragment = $("#custom-cost-template").content.cloneNode(true);
   $(".custom-cost-name", fragment).value = item.name || "";
   $(".custom-cost-amount", fragment).value = item.amount || "";
+  $(".custom-cost-amount", fragment).id = makeId("custom-cost-amount");
   $(".currency-unit", fragment).textContent = value("currency") || "EUR";
   $("#custom-costs").append(fragment);
 }
@@ -491,8 +569,7 @@ function addCustomCost(item = {}) {
 function loadJourney(record, useCurrentVehicle = false) {
   const input = record.input || {};
   const journey = record;
-  safeValue("journey-name", journey.name || ""); safeValue("origin", journey.origin || ""); safeValue("destination", journey.destination || "");
-  safeValue("stops", (journey.stops || []).join("\n")); safeValue("journey-notes", journey.notes || "");
+  safeValue("journey-name", journey.name || ""); safeValue("journey-notes", journey.notes || "");
   safeValue("one-way-distance", input.oneWayDistance ?? record.result?.oneWayDistance ?? ""); safeValue("additional-km", input.additionalKilometres ?? 0);
   safeValue("trip-multiplier", input.tripMultiplier ?? 1); safeValue("passenger-count", input.passengerCount ?? 1);
   const type = Number(input.tripMultiplier) === 2 ? "return" : Number(input.tripMultiplier) === 1 ? "one-way" : "custom";
@@ -507,7 +584,7 @@ function loadJourney(record, useCurrentVehicle = false) {
   updateEnergyFields();
   if (useCurrentVehicle && activeVehicle()) useVehicle(activeVehicle());
   calculateForm();
-  $("#route-section").scrollIntoView({ behavior: "smooth" });
+  $("#trip-section").scrollIntoView({ behavior: "smooth" });
 }
 
 async function duplicateJourney(record) {
@@ -524,7 +601,7 @@ function renderJourneys() {
     return;
   }
   container.className = "card-list";
-  container.innerHTML = state.journeys.map((journey) => `<article class="item-card"><h3>${escapeHtml(journey.name || `${journey.origin || "Route"} to ${journey.destination || "destination"}`)}</h3><p>${escapeHtml(journey.origin || "Manual route")} &rarr; ${escapeHtml(journey.destination || "Manual destination")}</p><p>${formatNumber(journey.result?.totalDistance, 1)} km · ${formatCurrency(journey.result?.totalCost, journey.result?.currency || "EUR")} · ${escapeHtml(new Date(journey.updatedAt || journey.createdAt).toLocaleDateString())}</p><div class="item-actions"><button type="button" data-journey-action="open" data-id="${escapeHtml(journey.id)}">Open</button><button type="button" data-journey-action="duplicate" data-id="${escapeHtml(journey.id)}">Duplicate</button><button type="button" data-journey-action="recalculate" data-id="${escapeHtml(journey.id)}">Recalculate current</button><button type="button" data-journey-action="export" data-id="${escapeHtml(journey.id)}">Export</button><button type="button" data-journey-action="delete" data-id="${escapeHtml(journey.id)}">Delete</button></div></article>`).join("");
+  container.innerHTML = state.journeys.map((journey) => `<article class="item-card"><h3>${escapeHtml(journey.name || "Untitled journey")}</h3><p>${escapeHtml(journey.vehicleName || "Custom vehicle")} &middot; ${Number(journey.result?.tripMultiplier) === 2 ? "Return" : Number(journey.result?.tripMultiplier) === 1 ? "One-way" : `Multiplier ${formatNumber(journey.result?.tripMultiplier, 2)}`}</p><p>${formatNumber(journey.result?.totalDistance, 1)} km · ${formatCurrency(journey.result?.totalCost, journey.result?.currency || "EUR")} · ${escapeHtml(new Date(journey.updatedAt || journey.createdAt).toLocaleDateString())}</p><div class="item-actions"><button type="button" data-journey-action="open" data-id="${escapeHtml(journey.id)}">Open</button><button type="button" data-journey-action="duplicate" data-id="${escapeHtml(journey.id)}">Duplicate</button><button type="button" data-journey-action="recalculate" data-id="${escapeHtml(journey.id)}">Recalculate current</button><button type="button" data-journey-action="export" data-id="${escapeHtml(journey.id)}">Export</button><button type="button" data-journey-action="delete" data-id="${escapeHtml(journey.id)}">Delete</button></div></article>`).join("");
 }
 
 async function handleJourneyAction(event) {
@@ -568,20 +645,23 @@ function resetCalculator(force = false) {
   updateEnergyFields();
   $("#result-total").textContent = "—"; $("#result-passenger").textContent = "—"; $("#result-distance").textContent = "—";
   $("#result-breakdown").innerHTML = "<div><dt>Energy</dt><dd>—</dd></div><div><dt>Tolls</dt><dd>—</dd></div><div><dt>Other costs</dt><dd>—</dd></div>";
-  $("#result-assumptions").textContent = "Enter a route and vehicle values, then calculate.";
+  $("#result-assumptions").textContent = "Enter the distance and vehicle values, then calculate.";
   ["save-journey", "recalculate-result", "duplicate-current", "copy-summary", "export-summary", "print-result"].forEach((id) => { $(`#${id}`).disabled = true; });
 }
 
 async function saveSettings(event) {
   event.preventDefault();
+  clearValidation(event.currentTarget);
+  message($("#settings-status"));
   try {
+    requireNativeValidity(event.currentTarget);
     const currency = value("currency").trim().toUpperCase();
-    if (!/^[A-Z]{3}$/.test(currency)) throw new ValidationError("Currency must use a three-letter code such as EUR.");
+    if (!/^[A-Z]{3}$/.test(currency)) throw new ValidationError("Currency must use a three-letter code such as EUR.", "Currency", "currency");
     storage.setSetting("currency", currency); storage.setSetting("theme", value("theme"));
     updateCurrencyLabels(); applyTheme(value("theme"));
     message($("#settings-status"), "Settings saved on this browser.", "success");
   } catch (error) {
-    message($("#settings-status"), error.message || "Settings could not be saved.", "error");
+    showValidationError(error, { form: event.currentTarget, status: $("#settings-status") });
   }
 }
 
@@ -631,7 +711,7 @@ function exportFillupsCsv() {
 }
 
 function exportJourneysCsv() {
-  downloadFile("vehicle-cost-calculator-journeys.csv", toCsv(state.journeys, [["Date", "updatedAt"], ["Journey", "name"], ["Origin", "origin"], ["Destination", "destination"], ["Vehicle", "vehicleName"], ["Distance km", (row) => row.result?.totalDistance], ["Energy cost", (row) => row.result?.energyCost], ["Tolls", (row) => row.result?.totalTolls], ["Total", (row) => row.result?.totalCost], ["Passengers", (row) => row.result?.passengerCount], ["Per passenger", (row) => row.result?.costPerPassenger], ["Currency", (row) => row.result?.currency], ["Notes", "notes"]]), "text/csv;charset=utf-8");
+  downloadFile("vehicle-cost-calculator-journeys.csv", toCsv(state.journeys, [["Date", "updatedAt"], ["Journey", "name"], ["Vehicle", "vehicleName"], ["Distance km", (row) => row.result?.totalDistance], ["Energy cost", (row) => row.result?.energyCost], ["Tolls", (row) => row.result?.totalTolls], ["Total", (row) => row.result?.totalCost], ["Passengers", (row) => row.result?.passengerCount], ["Per passenger", (row) => row.result?.costPerPassenger], ["Currency", (row) => row.result?.currency], ["Notes", "notes"]]), "text/csv;charset=utf-8");
 }
 
 async function deleteAllData() {
@@ -692,6 +772,11 @@ function bindEvents() {
   $("#export-fillups-csv").addEventListener("click", exportFillupsCsv);
   $("#export-journeys-csv").addEventListener("click", exportJourneysCsv);
   $("#delete-all-data").addEventListener("click", deleteAllData);
+  document.addEventListener("input", (event) => {
+    if (!(event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement)) return;
+    clearFieldError(event.target);
+    if ($("#journey-form").contains(event.target)) $("#form-errors").hidden = true;
+  });
 }
 
 async function initialise() {

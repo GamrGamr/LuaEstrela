@@ -7,8 +7,8 @@
     <meta name="theme-color" content="#063852" />
     <title>Vehicle Cost Calculator &mdash; EstrelaLuaApps</title>
     <link rel="icon" href="../../assets/favicon-32.ico" sizes="32x32" />
-    <link rel="stylesheet" href="calculator.css?v=4" />
-    <script type="module" src="calculator.js?v=4"></script>
+    <link rel="stylesheet" href="calculator.css?v=5" />
+    <script type="module" src="calculator.js?v=5"></script>
   </head>
   <body>
     <a class="skip-link" href="#calculator-main">Skip to calculator</a>
@@ -28,7 +28,7 @@
       <section class="calc-hero">
         <div>
           <p class="kicker">Travel cost calculator &middot; Beta</p>
-          <h1>Plan the route.<br /><em>Know the real cost.</em></h1>
+          <h1>Plan the cost.<br /><em>Know the real total.</em></h1>
           <p>Start with a distance, your vehicle&rsquo;s consumption, and an energy price. Add tolls and other costs only when you need them.</p>
         </div>
         <div class="mode-card">
@@ -38,7 +38,7 @@
       </section>
 
       <nav class="section-nav" aria-label="Calculator sections">
-        <a href="#route-section">1. Route</a>
+        <a href="#trip-section">1. Journey</a>
         <a href="#vehicle-section">2. Vehicle</a>
         <a href="#costs-section">3. Costs</a>
         <a href="#results-section">4. Results</a>
@@ -50,24 +50,15 @@
 
       <div class="calculator-layout">
         <form id="journey-form" class="journey-form" novalidate>
-          <details id="route-section" class="step-card" open>
-            <summary><span>01</span><div><strong>Route</strong><small>Where are you going?</small></div></summary>
+          <details id="trip-section" class="step-card" open>
+            <summary><span>01</span><div><strong>Journey</strong><small>Enter the distance and journey type.</small></div></summary>
             <div class="step-content">
-              <div class="field-grid two-columns">
-                <div class="field"><label for="origin">Origin</label><input id="origin" name="origin" type="text" maxlength="300" autocomplete="street-address" placeholder="Lisbon, Portugal" /></div>
-                <div class="field"><label for="destination">Destination</label><input id="destination" name="destination" type="text" maxlength="300" placeholder="Porto, Portugal" /></div>
-              </div>
-              <div class="field">
-                <label for="stops">Intermediate stops <span class="optional">Optional, one per line</span></label>
-                <textarea id="stops" name="stops" rows="2" maxlength="1500" placeholder="Coimbra, Portugal"></textarea>
-              </div>
-
               <fieldset>
                 <legend>Distance and duration</legend>
                 <div class="field-grid three-columns">
-                  <div class="field"><label for="one-way-distance">One-way distance</label><div class="unit-input"><input id="one-way-distance" name="oneWayDistance" inputmode="decimal" required /><span>km</span></div></div>
-                  <div class="field"><label for="manual-duration">One-way duration <span class="optional">Optional</span></label><div class="unit-input"><input id="manual-duration" name="manualDuration" inputmode="numeric" /><span>min</span></div></div>
-                  <div class="field"><label for="additional-km">Additional distance</label><div class="unit-input"><input id="additional-km" name="additionalKilometres" inputmode="decimal" value="0" /><span>km</span></div></div>
+                  <div class="field"><label for="one-way-distance">One-way distance</label><div class="unit-input"><input id="one-way-distance" name="oneWayDistance" inputmode="decimal" autocomplete="off" required aria-required="true" /><span>km</span></div><p class="field-help">Enter a value greater than zero.</p></div>
+                  <div class="field"><label for="manual-duration">One-way duration <span class="optional">Optional</span></label><div class="unit-input"><input id="manual-duration" name="manualDuration" inputmode="decimal" autocomplete="off" /><span>min</span></div></div>
+                  <div class="field"><label for="additional-km">Additional distance</label><div class="unit-input"><input id="additional-km" name="additionalKilometres" inputmode="decimal" autocomplete="off" value="0" /><span>km</span></div></div>
                 </div>
               </fieldset>
 
@@ -79,7 +70,7 @@
                   <label class="choice-card"><input type="radio" name="journeyType" value="custom" /><span>Custom</span></label>
                 </div>
                 <div class="field-grid three-columns compact-grid">
-                  <div class="field"><label for="trip-multiplier">Trip multiplier</label><input id="trip-multiplier" name="tripMultiplier" inputmode="decimal" value="1" required /></div>
+                  <div class="field"><label for="trip-multiplier">Trip multiplier</label><input id="trip-multiplier" name="tripMultiplier" inputmode="decimal" autocomplete="off" value="1" required aria-required="true" /></div>
                   <div class="field"><label for="passenger-count">Passengers</label><input id="passenger-count" name="passengerCount" type="number" min="1" step="1" value="1" required /></div>
                   <div class="field"><label for="journey-name">Journey name <span class="optional">Optional</span></label><input id="journey-name" name="journeyName" maxlength="120" placeholder="Weekend in Porto" /></div>
                 </div>
@@ -151,7 +142,7 @@
             <div><dt>Tolls</dt><dd>&mdash;</dd></div>
             <div><dt>Other costs</dt><dd>&mdash;</dd></div>
           </dl>
-          <div id="result-assumptions" class="result-assumptions">Enter a route and vehicle values, then calculate.</div>
+          <div id="result-assumptions" class="result-assumptions">Enter the distance and vehicle values, then calculate.</div>
           <div class="result-actions">
             <button id="save-journey" type="button" disabled>Save journey</button>
             <button id="recalculate-result" type="button" disabled>Recalculate</button>
@@ -238,7 +229,7 @@
         <div><p class="kicker">Privacy</p><h2 id="privacy-title">Your journey data belongs to you.</h2></div>
         <div>
           <p>Manual calculations, vehicles, fill-ups, and saved journeys remain in this browser. There are no accounts, analytics, telemetry, advertising, or cloud synchronisation. Clearing browser storage may remove saved information, so export a backup when it matters.</p>
-          <p>The calculator does not contact mapping, routing, toll, analytics, or cloud services. Enter route details and prices yourself, then export a backup if you want a copy outside this browser.</p>
+          <p>The calculator does not contact mapping, routing, toll, analytics, or cloud services. Enter the distance and prices yourself, then export a backup if you want a copy outside this browser.</p>
         </div>
       </section>
     </main>

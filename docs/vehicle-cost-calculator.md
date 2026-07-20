@@ -6,7 +6,7 @@ Open the app from `apps/vehicle-cost-calculator.html` or directly at `tools/vehi
 
 ## What the user enters
 
-- Optional origin, destination, intermediate stops, journey name, and notes
+- Optional journey name and notes for saved calculations
 - One-way distance and optional one-way duration
 - One-way, return, or custom trip multiplier
 - Optional additional kilometres
@@ -84,7 +84,7 @@ Structured records use IndexedDB. Currency and theme preferences use localStorag
 
 The calculator does not contact mapping, routing, toll, analytics, advertising, telemetry, or cloud services. Journey details remain in the current browser unless the user explicitly exports a file. Clearing browser storage can remove saved information, so important data should be backed up.
 
-Database version 2 removes obsolete online-route cache data and related fields while preserving existing vehicles, fill-ups, journeys, and price history.
+Database version 3 removes obsolete online-route and location fields while preserving existing vehicles, fill-ups, journeys, and price history.
 
 ## Files
 
@@ -106,6 +106,7 @@ The suite covers:
 - Journey multipliers and additional distance
 - Tolls and other manual costs
 - Passenger splitting and numeric validation
+- Field-level validation for missing, malformed, negative, out-of-range, and non-integer values
 - Full-tank consumption measurement
 - IndexedDB create, update, read, delete, backup, and import
 - Removal of obsolete online-route data without losing saved records

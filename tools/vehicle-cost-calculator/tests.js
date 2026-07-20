@@ -1,5 +1,5 @@
-import { ValidationError, calculateFillUpConsumption, calculateJourney, formatCurrency } from "./calculations.js?v=4";
-import { CalculatorStorage } from "./storage.js?v=4";
+import { ValidationError, calculateFillUpConsumption, calculateJourney, formatCurrency, parseNumber } from "./calculations.js?v=5";
+import { CalculatorStorage } from "./storage.js?v=5";
 
 const results = [];
 const base = { oneWayDistance: 100, tripMultiplier: 1, passengerCount: 1, energyType: "petrol", fuelConsumption: 6, fuelPrice: 2, currency: "EUR" };
@@ -28,10 +28,15 @@ await test("Multiple custom costs", () => close(calculateJourney({ ...base, cust
 await test("Passenger splitting", () => close(calculateJourney({ ...base, passengerCount: 4 }).costPerPassenger, 3));
 await test("Currency display rounds to two decimals", () => assert(/12[,.]35/.test(formatCurrency(12.345, "EUR", "en-IE"))));
 await test("Decimal comma input", () => close(calculateJourney({ ...base, fuelConsumption: "6,5" }).fuelQuantity, 6.5));
+await test("Locale-formatted number input", () => close(parseNumber("1.234,56"), 1234.56));
+await test("Malformed grouped number rejected", () => { let threw = false; try { parseNumber("1,2,3.4"); } catch { threw = true; } assert(threw); });
 await test("Invalid numeric input rejected", () => { let threw = false; try { calculateJourney({ ...base, fuelPrice: "abc" }); } catch (error) { threw = error instanceof ValidationError; } assert(threw); });
 await test("Negative values rejected", () => { let threw = false; try { calculateJourney({ ...base, parkingCost: -1 }); } catch { threw = true; } assert(threw); });
 await test("Negative tolls rejected", () => { let threw = false; try { calculateJourney({ ...base, outboundToll: -1 }); } catch { threw = true; } assert(threw); });
 await test("Zero passengers prevented", () => { let threw = false; try { calculateJourney({ ...base, passengerCount: 0 }); } catch { threw = true; } assert(threw); });
+await test("Fractional passengers prevented", () => { let threw = false; try { calculateJourney({ ...base, passengerCount: 1.5 }); } catch { threw = true; } assert(threw); });
+await test("Zero distance prevented", () => { let threw = false; try { calculateJourney({ ...base, oneWayDistance: 0 }); } catch { threw = true; } assert(threw); });
+await test("Plug-in hybrid requires a price for each used energy source", () => { let threw = false; try { calculateJourney({ ...base, energyType: "plug-in-hybrid", fuelConsumption: 2, electricConsumption: 0, fuelPrice: "" }); } catch { threw = true; } assert(threw); });
 await test("NaN and Infinity prevented", () => { let threw = false; try { calculateJourney({ ...base, fuelPrice: Infinity }); } catch { threw = true; } assert(threw); });
 
 const fullTankRecords = [
@@ -73,7 +78,7 @@ await new Promise((resolve, reject) => {
     const database = request.result;
     const transaction = database.transaction(["vehicles", "journeys", "routeCache"], "readwrite");
     transaction.objectStore("vehicles").put({ id: "old-vehicle", name: "Existing car", tollCategory: "passenger-car", axleCount: 2 });
-    transaction.objectStore("journeys").put({ id: "old-journey", name: "Existing journey", provider: "Old service", routeSelection: { id: "route" }, input: { oneWayDistance: 10, tollSource: "Old service" } });
+    transaction.objectStore("journeys").put({ id: "old-journey", name: "Existing journey", origin: "Lisbon", destination: "Porto", stops: ["Coimbra"], provider: "Old service", routeSelection: { id: "route" }, input: { oneWayDistance: 10, tollSource: "Old service" } });
     transaction.objectStore("routeCache").put({ id: "old-route", value: 1 });
     transaction.oncomplete = () => { database.close(); resolve(); };
     transaction.onerror = () => reject(transaction.error);
@@ -85,7 +90,7 @@ await test("Online-route data is removed without losing saved records", async ()
   assert(!database.objectStoreNames.contains("routeCache"));
   const vehicle = await migrationStorage.get("vehicles", "old-vehicle");
   const journey = await migrationStorage.get("journeys", "old-journey");
-  assert(vehicle.name === "Existing car" && !("tollCategory" in vehicle) && journey.name === "Existing journey" && !("provider" in journey) && !("tollSource" in journey.input));
+  assert(vehicle.name === "Existing car" && !("tollCategory" in vehicle) && journey.name === "Existing journey" && !("provider" in journey) && !("origin" in journey) && !("destination" in journey) && !("stops" in journey) && !("tollSource" in journey.input));
 });
 await test("Relative calculator path works under /EstrelaLua/", () => { const target = new URL("../../apps/vehicle-cost-calculator.html", "https://gamrgamr.github.io/EstrelaLua/tools/vehicle-cost-calculator/index.html"); assert(target.pathname === "/EstrelaLua/apps/vehicle-cost-calculator.html"); });
 
