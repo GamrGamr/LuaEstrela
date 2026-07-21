@@ -1,4 +1,4 @@
-import { ValidationError, calculateHomeEnergy, formatCurrency, formatNumber, sanitiseDecimalInput, sanitiseIntegerInput } from "./calculations.js?v=1";
+import { ValidationError, calculateHomeEnergy, formatCurrency, formatNumber, sanitiseDecimalInput, sanitiseIntegerInput } from "./calculations.js?v=2";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -6,7 +6,7 @@ const STORAGE_KEY = "estrelalua-home-energy-v1";
 let nextRowId = 1;
 let calculateTimer = 0;
 
-const blankAppliance = () => ({ id: String(nextRowId++), name: "", watts: "", quantity: "1", hoursPerDay: "", daysPerMonth: "30" });
+const blankAppliance = () => ({ id: String(nextRowId++), name: "", mode: "estimate", watts: "", quantity: "1", hoursPerDay: "", daysPerMonth: "30", monthlyKwh: "" });
 const exampleHome = [
   { name: "Refrigerator", watts: "120", quantity: "1", hoursPerDay: "8", daysPerMonth: "30" },
   { name: "Television", watts: "100", quantity: "1", hoursPerDay: "4", daysPerMonth: "30" },
@@ -24,25 +24,42 @@ function addAppliance(appliance = blankAppliance()) {
     nextRowId = Math.max(nextRowId, numericId + 1);
   }
   $(".appliance-name", row).value = appliance.name ?? "";
+  $(".appliance-mode", row).value = appliance.mode === "known" ? "known" : "estimate";
   $(".appliance-watts", row).value = appliance.watts ?? "";
   $(".appliance-quantity", row).value = appliance.quantity ?? "1";
   $(".appliance-hours", row).value = appliance.hoursPerDay ?? "";
   $(".appliance-days", row).value = appliance.daysPerMonth ?? "30";
+  $(".appliance-known-kwh", row).value = appliance.monthlyKwh ?? "";
   $("#appliance-list").append(row);
+  syncApplianceMode(row);
   syncRowLabels();
+}
+
+function syncApplianceMode(row) {
+  const knownMode = $(".appliance-mode", row).value === "known";
+  const estimateFields = $(".estimate-inputs", row);
+  const knownFields = $(".known-inputs", row);
+  estimateFields.hidden = knownMode;
+  knownFields.hidden = !knownMode;
+  $$("input", estimateFields).forEach((input) => { input.disabled = knownMode; });
+  $$("input", knownFields).forEach((input) => { input.disabled = !knownMode; });
+  $(".row-estimate", row).textContent = knownMode
+    ? "Enter this appliance's total kWh for one month."
+    : "Enter the appliance details to calculate its monthly use.";
 }
 
 function syncRowLabels() {
   $$(".appliance-row").forEach((row, index) => {
     $("h3", row).textContent = `Appliance ${index + 1}`;
     const fields = [
-      [".appliance-name", "name"], [".appliance-watts", "watts"], [".appliance-quantity", "quantity"],
-      [".appliance-hours", "hours"], [".appliance-days", "days"],
+      [".appliance-name", "name"], [".appliance-mode", "mode"], [".appliance-watts", "watts"],
+      [".appliance-quantity", "quantity"], [".appliance-hours", "hours"], [".appliance-days", "days"],
+      [".appliance-known-kwh", "kwh"],
     ];
     fields.forEach(([selector, suffix]) => {
-      const input = $(selector, row);
-      input.id = `appliance-${index}-${suffix}`;
-      input.closest(".field").querySelector("label").htmlFor = input.id;
+      const control = $(selector, row);
+      control.id = `appliance-${index}-${suffix}`;
+      control.closest(".field").querySelector("label").htmlFor = control.id;
     });
   });
 }
@@ -52,10 +69,12 @@ function readAppliances() {
   return $$(".appliance-row").map((row) => ({
     id: row.dataset.id,
     name: $(".appliance-name", row).value,
+    mode: $(".appliance-mode", row).value,
     watts: $(".appliance-watts", row).value,
     quantity: $(".appliance-quantity", row).value,
     hoursPerDay: $(".appliance-hours", row).value,
     daysPerMonth: $(".appliance-days", row).value,
+    monthlyKwh: $(".appliance-known-kwh", row).value,
   }));
 }
 
@@ -104,7 +123,9 @@ function updateRowEstimates(result) {
     const item = byId.get(String(row.dataset.id));
     $(".row-estimate", row).textContent = item
       ? `${formatNumber(item.monthlyKwh)} kWh/month · ${formatCurrency(item.monthlyCost)}/month`
-      : "Enter the appliance details to calculate its monthly use.";
+      : $(".appliance-mode", row).value === "known"
+        ? "Enter this appliance's total kWh for one month."
+        : "Enter the appliance details to calculate its monthly use.";
   });
 }
 
@@ -186,6 +207,13 @@ function bindEvents() {
     button.closest(".appliance-row").remove();
     if (!$(".appliance-row")) addAppliance();
     syncRowLabels(); saveDraft(); calculate({ showErrors: false });
+  });
+  $("#appliance-list").addEventListener("change", (event) => {
+    if (!event.target.matches(".appliance-mode")) return;
+    const row = event.target.closest(".appliance-row");
+    syncApplianceMode(row);
+    saveDraft();
+    if (!calculate({ showErrors: false })) resetResults();
   });
   document.addEventListener("beforeinput", (event) => {
     if (!(event.target instanceof HTMLInputElement) || !event.inputType.startsWith("insert") || event.data === null) return;

@@ -1,4 +1,4 @@
-import { ValidationError, calculateHomeEnergy, formatCurrency, parseNumber, sanitiseDecimalInput, sanitiseIntegerInput } from "./calculations.js?v=1";
+import { ValidationError, calculateHomeEnergy, formatCurrency, parseNumber, sanitiseDecimalInput, sanitiseIntegerInput } from "./calculations.js?v=2";
 
 const results = [];
 const assert = (condition, message = "Assertion failed") => { if (!condition) throw new Error(message); };
@@ -17,6 +17,10 @@ await test("Multiple appliances are totalled", () => closeTo(calculateHomeEnergy
 await test("Fixed monthly charge is included", () => closeTo(calculateHomeEnergy({ ...base, fixedMonthlyCost: "7" }).monthlyCost, 10));
 await test("Annual result is twelve months", () => closeTo(calculateHomeEnergy(base).annualCost, 36));
 await test("Decimal comma is accepted", () => closeTo(calculateHomeEnergy({ ...base, pricePerKwh: "0,25" }).monthlyCost, 3));
+await test("Known monthly kWh is accepted directly", () => closeTo(calculateHomeEnergy({ ...base, appliances: [{ name: "Computer", mode: "known", monthlyKwh: "18" }] }).monthlyKwh, 18));
+await test("Known monthly kWh calculates cost", () => closeTo(calculateHomeEnergy({ ...base, appliances: [{ name: "Computer", mode: "known", monthlyKwh: "18" }] }).monthlyCost, 4.5));
+await test("Known kWh does not require watts or hours", () => closeTo(calculateHomeEnergy({ ...base, appliances: [{ name: "Computer", mode: "known", monthlyKwh: "18", watts: "", hoursPerDay: "" }] }).annualKwh, 216));
+await test("Estimated and known usage can be combined", () => closeTo(calculateHomeEnergy({ ...base, appliances: [...base.appliances, { name: "Computer", mode: "known", monthlyKwh: "18" }] }).monthlyKwh, 30));
 await test("Highest consumer is listed first", () => assert(calculateHomeEnergy({ ...base, appliances: [{ ...base.appliances[0], name: "Small" }, { name: "Large", watts: "1000", quantity: "1", hoursPerDay: "2", daysPerMonth: "30" }] }).items[0].name === "Large"));
 await test("Letters are removed from decimal input", () => assert(sanitiseDecimalInput("abc12,5xyz") === "12,5"));
 await test("Only one decimal separator is kept", () => assert(sanitiseDecimalInput("1.2,3") === "1.23"));
@@ -25,6 +29,7 @@ await test("Missing appliances are rejected", () => { try { calculateHomeEnergy(
 await test("More than 24 hours is rejected", () => { try { calculateHomeEnergy({ ...base, appliances: [{ ...base.appliances[0], hoursPerDay: "25" }] }); } catch (error) { assert(error instanceof ValidationError); return; } throw new Error("Expected validation error"); });
 await test("More than 31 days is rejected", () => { try { calculateHomeEnergy({ ...base, appliances: [{ ...base.appliances[0], daysPerMonth: "32" }] }); } catch (error) { assert(error instanceof ValidationError); return; } throw new Error("Expected validation error"); });
 await test("Zero power is rejected", () => { try { calculateHomeEnergy({ ...base, appliances: [{ ...base.appliances[0], watts: "0" }] }); } catch (error) { assert(error instanceof ValidationError); return; } throw new Error("Expected validation error"); });
+await test("Zero known monthly kWh is rejected", () => { try { calculateHomeEnergy({ ...base, appliances: [{ name: "Computer", mode: "known", monthlyKwh: "0" }] }); } catch (error) { assert(error instanceof ValidationError); return; } throw new Error("Expected validation error"); });
 await test("Non-numeric input is rejected", () => { try { parseNumber("hello", { field: "Value" }); } catch (error) { assert(error instanceof ValidationError); return; } throw new Error("Expected validation error"); });
 await test("Currency is formatted in euros", () => assert(formatCurrency(12.5).includes("12.50")));
 
