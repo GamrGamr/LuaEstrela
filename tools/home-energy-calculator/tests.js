@@ -1,4 +1,4 @@
-import { ValidationError, calculateHomeEnergy, formatCurrency, parseNumber, sanitiseDecimalInput, sanitiseIntegerInput } from "./calculations.js?v=5";
+import { ValidationError, calculateHomeEnergy, formatCurrency, parseNumber, sanitiseDecimalInput, sanitiseIntegerInput } from "./calculations.js?v=6";
 
 const results = [];
 const assert = (condition, message = "Assertion failed") => { if (!condition) throw new Error(message); };
@@ -41,7 +41,8 @@ await test("Integer input removes non-digits", () => assert(sanitiseIntegerInput
 await test("Missing appliances are rejected", () => { try { calculateHomeEnergy({ pricePerKwh: "0.25", appliances: [] }); } catch (error) { assert(error instanceof ValidationError); return; } throw new Error("Expected validation error"); });
 await test("More than 24 hours is rejected", () => { try { calculateHomeEnergy({ ...base, appliances: [{ ...base.appliances[0], hoursPerDay: "25" }] }); } catch (error) { assert(error instanceof ValidationError); return; } throw new Error("Expected validation error"); });
 await test("More than 31 days is rejected", () => { try { calculateHomeEnergy({ ...base, appliances: [{ ...base.appliances[0], daysPerMonth: "32" }] }); } catch (error) { assert(error instanceof ValidationError); return; } throw new Error("Expected validation error"); });
-await test("Zero power is rejected", () => { try { calculateHomeEnergy({ ...base, appliances: [{ ...base.appliances[0], watts: "0" }] }); } catch (error) { assert(error instanceof ValidationError); return; } throw new Error("Expected validation error"); });
+await test("Zero power produces zero usage", () => closeTo(calculateHomeEnergy({ ...base, appliances: [{ ...base.appliances[0], watts: "0" }] }).monthlyKwh, 0));
+await test("Zero power produces zero cost", () => closeTo(calculateHomeEnergy({ ...base, appliances: [{ ...base.appliances[0], watts: "0" }] }).monthlyCost, 0));
 await test("Zero measured monthly kWh is rejected", () => { try { calculateHomeEnergy({ ...base, appliances: [{ name: "Computer", monthlyKwh: "0" }] }); } catch (error) { assert(error instanceof ValidationError); return; } throw new Error("Expected validation error"); });
 await test("Non-numeric input is rejected", () => { try { parseNumber("hello", { field: "Value" }); } catch (error) { assert(error instanceof ValidationError); return; } throw new Error("Expected validation error"); });
 await test("Currency is formatted in euros", () => assert(formatCurrency(12.5).includes("12.50")));

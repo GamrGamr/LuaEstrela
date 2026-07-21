@@ -72,7 +72,7 @@ export function calculateHomeEnergy(input = {}) {
         annualCost: monthlyCost * 12,
       };
     }
-    const watts = parseNumber(appliance.watts, { field: `${name} power`, fieldId: `appliance-${index}-watts`, min: 0.01, max: 1000000 });
+    const watts = parseNumber(appliance.watts, { field: `${name} power`, fieldId: `appliance-${index}-watts`, min: 0, max: 1000000 });
     const quantity = parseNumber(appliance.quantity, { field: `${name} quantity`, fieldId: `appliance-${index}-quantity`, min: 1, max: 10000, integer: true });
     const hoursPerDay = parseNumber(appliance.hoursPerDay, { field: `${name} daily use`, fieldId: `appliance-${index}-hours`, min: 0.01, max: 24 });
     const daysPerMonth = parseNumber(appliance.daysPerMonth, { field: `${name} monthly days`, fieldId: `appliance-${index}-days`, min: 1, max: 31, integer: true });
