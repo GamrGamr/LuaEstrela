@@ -7,8 +7,8 @@
     <meta name="theme-color" content="#063852" />
     <title>Home Energy Calculator &mdash; EstrelaLuaApps</title>
     <link rel="icon" href="../../assets/favicon-32.ico" sizes="32x32" />
-    <link rel="stylesheet" href="calculator.css?v=3" />
-    <script type="module" src="calculator.js?v=3"></script>
+    <link rel="stylesheet" href="calculator.css?v=4" />
+    <script type="module" src="calculator.js?v=4"></script>
   </head>
   <body>
     <a class="skip-link" href="#calculator-main">Skip to calculator</a>
@@ -42,18 +42,28 @@
           <section class="panel tariff-panel" aria-labelledby="tariff-title">
             <div class="panel-heading">
               <span class="step-number">01</span>
-              <div><p class="section-kicker">Your tariff</p><h2 id="tariff-title">Electricity price</h2></div>
+              <div><p class="section-kicker">Your tariff</p><h2 id="tariff-title">Electricity tariff</h2></div>
             </div>
             <div class="tariff-grid">
               <div class="field">
-                <label for="price-per-kwh">Price per kWh</label>
+                <label for="price-per-kwh">Energy price</label>
                 <div class="unit-input"><input id="price-per-kwh" inputmode="decimal" autocomplete="off" value="0.25" required /><span>EUR/kWh</span></div>
-                <p class="field-help">Use the energy price shown on your electricity bill.</p>
+                <p class="field-help">For example, enter 0.14 when energy costs &euro;0.14 per kWh.</p>
               </div>
               <div class="field">
-                <label for="fixed-monthly-cost">Fixed monthly charge <span>Optional</span></label>
+                <label for="contracted-power-price">Contracted power price <span>Optional</span></label>
+                <div class="unit-input"><input id="contracted-power-price" inputmode="decimal" autocomplete="off" value="0" /><span>EUR/day</span></div>
+                <p class="field-help">Enter the daily contracted-power price shown on your bill.</p>
+              </div>
+              <div class="field">
+                <label for="billing-days">Billing days</label>
+                <div class="unit-input"><input id="billing-days" inputmode="numeric" autocomplete="off" value="30" /><span>days</span></div>
+                <p class="field-help">Use the number of days covered by the electricity bill.</p>
+              </div>
+              <div class="field">
+                <label for="fixed-monthly-cost">Other fixed charges <span>Optional</span></label>
                 <div class="unit-input"><input id="fixed-monthly-cost" inputmode="decimal" autocomplete="off" value="0" /><span>EUR</span></div>
-                <p class="field-help">Add a standing or contracted-power charge if you want it included.</p>
+                <p class="field-help">Add another recurring charge only if you want it included.</p>
               </div>
             </div>
           </section>
@@ -85,7 +95,7 @@
         <aside id="results" class="results-card" aria-labelledby="results-title" aria-live="polite">
           <p class="results-kicker">Estimated household total</p>
           <h2 id="results-title">Monthly cost</h2>
-          <div class="monthly-total"><strong id="monthly-cost">&euro;0.00</strong><span>including the fixed charge</span></div>
+          <div class="monthly-total"><strong id="monthly-cost">&euro;0.00</strong><span>including power and fixed charges</span></div>
           <div class="result-highlights">
             <div><span>Monthly use</span><strong id="monthly-kwh">0 kWh</strong></div>
             <div><span>Average daily cost</span><strong id="daily-cost">&euro;0.00</strong></div>
@@ -94,7 +104,8 @@
           </div>
           <dl class="result-breakdown">
             <div><dt>Energy charge</dt><dd id="energy-charge">&euro;0.00</dd></div>
-            <div><dt>Fixed charge</dt><dd id="fixed-charge">&euro;0.00</dd></div>
+            <div><dt>Contracted power</dt><dd id="power-charge">&euro;0.00</dd></div>
+            <div><dt>Other fixed charges</dt><dd id="fixed-charge">&euro;0.00</dd></div>
             <div><dt>Average daily use</dt><dd id="daily-kwh">0 kWh</dd></div>
           </dl>
           <div class="usage-heading"><h3>Biggest energy users</h3><span>per month</span></div>

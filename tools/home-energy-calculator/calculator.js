@@ -1,4 +1,4 @@
-import { ValidationError, calculateHomeEnergy, formatCurrency, formatNumber, sanitiseDecimalInput, sanitiseIntegerInput } from "./calculations.js?v=2";
+import { ValidationError, calculateHomeEnergy, formatCurrency, formatNumber, sanitiseDecimalInput, sanitiseIntegerInput } from "./calculations.js?v=3";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -79,7 +79,13 @@ function readAppliances() {
 }
 
 function readInput() {
-  return { pricePerKwh: $("#price-per-kwh").value, fixedMonthlyCost: $("#fixed-monthly-cost").value, appliances: readAppliances() };
+  return {
+    pricePerKwh: $("#price-per-kwh").value,
+    contractedPowerPricePerDay: $("#contracted-power-price").value,
+    billingDays: $("#billing-days").value,
+    fixedMonthlyCost: $("#fixed-monthly-cost").value,
+    appliances: readAppliances(),
+  };
 }
 
 function saveDraft() {
@@ -96,6 +102,8 @@ function loadDraft() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (!saved || !Array.isArray(saved.appliances)) return false;
     $("#price-per-kwh").value = saved.pricePerKwh ?? "0.25";
+    $("#contracted-power-price").value = saved.contractedPowerPricePerDay ?? "0";
+    $("#billing-days").value = saved.billingDays ?? "30";
     $("#fixed-monthly-cost").value = saved.fixedMonthlyCost ?? "0";
     saved.appliances.forEach(addAppliance);
     return true;
@@ -136,6 +144,7 @@ function renderResult(result) {
   $("#annual-cost").textContent = formatCurrency(result.annualCost);
   $("#annual-kwh").textContent = `${formatNumber(result.annualKwh)} kWh`;
   $("#energy-charge").textContent = formatCurrency(result.monthlyEnergyCost);
+  $("#power-charge").textContent = formatCurrency(result.monthlyPowerCost);
   $("#fixed-charge").textContent = formatCurrency(result.fixedMonthlyCost);
   $("#daily-kwh").textContent = `${formatNumber(result.dailyKwh)} kWh`;
 
@@ -157,6 +166,7 @@ function resetResults() {
     annualCost: 0,
     annualKwh: 0,
     monthlyEnergyCost: 0,
+    monthlyPowerCost: 0,
     fixedMonthlyCost: 0,
     dailyKwh: 0,
     items: [],
@@ -194,6 +204,8 @@ function bindEvents() {
   });
   $("#reset-calculator").addEventListener("click", () => {
     $("#price-per-kwh").value = "0.25";
+    $("#contracted-power-price").value = "0";
+    $("#billing-days").value = "30";
     $("#fixed-monthly-cost").value = "0";
     $("#appliance-list").replaceChildren();
     addAppliance();

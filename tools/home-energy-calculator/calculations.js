@@ -36,6 +36,12 @@ export function parseNumber(value, { field, fieldId = "", min = 0, max = Number.
 
 export function calculateHomeEnergy(input = {}) {
   const pricePerKwh = parseNumber(input.pricePerKwh, { field: "Electricity price", fieldId: "price-per-kwh", min: 0, max: 100 });
+  const contractedPowerPricePerDay = input.contractedPowerPricePerDay === "" || input.contractedPowerPricePerDay == null
+    ? 0
+    : parseNumber(input.contractedPowerPricePerDay, { field: "Contracted power price", fieldId: "contracted-power-price", min: 0, max: 1000 });
+  const billingDays = input.billingDays === "" || input.billingDays == null
+    ? 30
+    : parseNumber(input.billingDays, { field: "Billing days", fieldId: "billing-days", min: 1, max: 366, integer: true });
   const fixedMonthlyCost = input.fixedMonthlyCost === "" || input.fixedMonthlyCost == null
     ? 0
     : parseNumber(input.fixedMonthlyCost, { field: "Fixed monthly charge", fieldId: "fixed-monthly-cost", min: 0, max: 100000 });
@@ -82,19 +88,27 @@ export function calculateHomeEnergy(input = {}) {
 
   const monthlyKwh = items.reduce((sum, item) => sum + item.monthlyKwh, 0);
   const monthlyEnergyCost = items.reduce((sum, item) => sum + item.monthlyCost, 0);
-  const monthlyCost = monthlyEnergyCost + fixedMonthlyCost;
+  const monthlyPowerCost = contractedPowerPricePerDay * billingDays;
+  const monthlyCost = monthlyEnergyCost + monthlyPowerCost + fixedMonthlyCost;
+  const annualEnergyCost = monthlyEnergyCost * 12;
+  const annualPowerCost = contractedPowerPricePerDay * 365;
+  const annualCost = annualEnergyCost + annualPowerCost + (fixedMonthlyCost * 12);
   return {
     pricePerKwh,
+    contractedPowerPricePerDay,
+    billingDays,
     fixedMonthlyCost,
     items: items.sort((left, right) => right.monthlyKwh - left.monthlyKwh),
-    dailyKwh: monthlyKwh / 30,
-    dailyCost: monthlyCost / 30,
+    dailyKwh: monthlyKwh / billingDays,
+    dailyCost: monthlyCost / billingDays,
     monthlyKwh,
     monthlyEnergyCost,
+    monthlyPowerCost,
     monthlyCost,
     annualKwh: monthlyKwh * 12,
-    annualEnergyCost: monthlyEnergyCost * 12,
-    annualCost: monthlyCost * 12,
+    annualEnergyCost,
+    annualPowerCost,
+    annualCost,
   };
 }
 

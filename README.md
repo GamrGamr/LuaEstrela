@@ -38,7 +38,7 @@ A fully manual browser-based journey calculator for fuel, electricity, tolls, pa
 
 ### Home Energy Calculator
 
-A private browser-based household electricity calculator. Estimate appliances from their power and running time or enter known monthly kWh totals directly, then calculate electricity costs by day, month, and year. The household setup is stored only in the current browser.
+A private browser-based household electricity calculator. Enter energy and daily contracted-power prices, then estimate appliances from their power and running time or enter known monthly kWh totals directly. It calculates energy, contracted-power, and optional fixed costs by day, month, and year, while storing the household setup only in the current browser.
 
 ## About the project
 
