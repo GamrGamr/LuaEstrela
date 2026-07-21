@@ -57,7 +57,8 @@ export function calculateHomeEnergy(input = {}) {
   const items = appliances.map((appliance, index) => {
     const position = index + 1;
     const name = String(appliance.name ?? "").trim() || `Appliance ${position}`;
-    const hasMeasuredKwh = String(appliance.monthlyKwh ?? "").trim() !== "";
+    const measuredKwhText = String(appliance.monthlyKwh ?? "").trim().replace(",", ".");
+    const hasMeasuredKwh = measuredKwhText !== "" && Number(measuredKwhText) !== 0;
     const mode = hasMeasuredKwh ? "measured" : "estimate";
     if (hasMeasuredKwh) {
       const monthlyKwh = parseNumber(appliance.monthlyKwh, { field: `${name} monthly use`, fieldId: `appliance-${index}-kwh`, min: 0.01, max: 100000000 });
@@ -75,7 +76,7 @@ export function calculateHomeEnergy(input = {}) {
     const watts = parseNumber(appliance.watts, { field: `${name} power`, fieldId: `appliance-${index}-watts`, min: 0, max: 1000000 });
     const quantity = parseNumber(appliance.quantity, { field: `${name} quantity`, fieldId: `appliance-${index}-quantity`, min: 1, max: 10000, integer: true });
     const hoursPerDay = parseNumber(appliance.hoursPerDay, { field: `${name} daily use`, fieldId: `appliance-${index}-hours`, min: 0, max: 24 });
-    const daysPerMonth = parseNumber(appliance.daysPerMonth, { field: `${name} monthly days`, fieldId: `appliance-${index}-days`, min: 1, max: 31, integer: true });
+    const daysPerMonth = parseNumber(appliance.daysPerMonth, { field: `${name} monthly days`, fieldId: `appliance-${index}-days`, min: 0, max: 31, integer: true });
     const monthlyKwh = (watts / 1000) * quantity * hoursPerDay * daysPerMonth;
     const monthlyCost = monthlyKwh * pricePerKwh * (1 + (energyIvaRate / 100));
     return {

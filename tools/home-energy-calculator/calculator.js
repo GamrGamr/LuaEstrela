@@ -1,4 +1,4 @@
-import { ValidationError, calculateHomeEnergy, formatCurrency, formatNumber, sanitiseDecimalInput, sanitiseIntegerInput } from "./calculations.js?v=7";
+import { ValidationError, calculateHomeEnergy, formatCurrency, formatNumber, sanitiseDecimalInput, sanitiseIntegerInput } from "./calculations.js?v=8";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -36,7 +36,8 @@ function addAppliance(appliance = blankAppliance()) {
 
 function syncMeasuredMode(row) {
   const measuredInput = $(".appliance-known-kwh", row);
-  const usesMeasuredKwh = measuredInput.value.trim() !== "";
+  const measuredValue = Number(measuredInput.value.trim().replace(",", "."));
+  const usesMeasuredKwh = Number.isFinite(measuredValue) && measuredValue > 0;
   row.classList.toggle("uses-measured-kwh", usesMeasuredKwh);
   $$(".appliance-watts, .appliance-quantity, .appliance-hours, .appliance-days", row).forEach((input) => {
     input.disabled = usesMeasuredKwh;
@@ -44,6 +45,15 @@ function syncMeasuredMode(row) {
   $(".input-choice-note", row).textContent = usesMeasuredKwh
     ? "Measured kWh is active. Power, Quantity, Hours, and Days are ignored for this appliance."
     : "Enter measured kWh to use the meter reading instead of Power, Quantity, Hours, and Days.";
+}
+
+function applyInputBounds(input) {
+  const value = Number(input.value.replace(",", "."));
+  if (!input.value.trim() || !Number.isFinite(value)) return;
+  const minimum = input.dataset.min === undefined ? null : Number(input.dataset.min);
+  const maximum = input.dataset.max === undefined ? null : Number(input.dataset.max);
+  if (minimum !== null && value < minimum) input.value = String(minimum);
+  if (maximum !== null && value > maximum) input.value = String(maximum);
 }
 
 function syncRowLabels() {
@@ -132,7 +142,7 @@ function updateRowEstimates(result) {
     const item = byId.get(String(row.dataset.id));
     $(".row-estimate", row).textContent = item
       ? `${formatNumber(item.monthlyKwh)} kWh/month · ${formatCurrency(item.monthlyCost)}/month`
-      : $(".appliance-known-kwh", row).value.trim()
+      : Number($(".appliance-known-kwh", row).value.trim().replace(",", ".")) > 0
         ? "Enter a valid measured monthly kWh value."
         : "Enter the appliance details to calculate its monthly use.";
   });
@@ -208,14 +218,14 @@ function bindEvents() {
     saveDraft(); calculate();
   });
   $("#reset-calculator").addEventListener("click", () => {
-    $("#price-per-kwh").value = "0.25";
+    $("#price-per-kwh").value = "0";
     $("#energy-iva").value = "0";
     $("#contracted-power-price").value = "0";
     $("#contracted-power-iva").value = "0";
-    $("#billing-days").value = "30";
+    $("#billing-days").value = "0";
     $("#fixed-monthly-cost").value = "0";
     $("#appliance-list").replaceChildren();
-    addAppliance();
+    addAppliance({ id: String(nextRowId++), name: "", watts: "0", quantity: "1", hoursPerDay: "0", daysPerMonth: "0", monthlyKwh: "0" });
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
     clearErrors();
     resetResults();
@@ -240,6 +250,7 @@ function bindEvents() {
     if (!(event.target instanceof HTMLInputElement)) return;
     if (event.target.inputMode === "decimal") event.target.value = sanitiseDecimalInput(event.target.value);
     if (event.target.inputMode === "numeric") event.target.value = sanitiseIntegerInput(event.target.value);
+    applyInputBounds(event.target);
     if (event.target.classList.contains("appliance-known-kwh")) syncMeasuredMode(event.target.closest(".appliance-row"));
     event.target.removeAttribute("aria-invalid");
     scheduleCalculation();
