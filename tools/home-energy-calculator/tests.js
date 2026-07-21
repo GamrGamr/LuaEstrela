@@ -1,4 +1,4 @@
-import { ValidationError, calculateHomeEnergy, formatCurrency, parseNumber, sanitiseDecimalInput, sanitiseIntegerInput } from "./calculations.js?v=4";
+import { ValidationError, calculateHomeEnergy, formatCurrency, parseNumber, sanitiseDecimalInput, sanitiseIntegerInput } from "./calculations.js?v=5";
 
 const results = [];
 const assert = (condition, message = "Assertion failed") => { if (!condition) throw new Error(message); };
@@ -15,10 +15,16 @@ await test("Single appliance monthly cost", () => closeTo(calculateHomeEnergy(ba
 await test("Quantity is included", () => closeTo(calculateHomeEnergy({ ...base, appliances: [{ ...base.appliances[0], quantity: "2" }] }).monthlyKwh, 24));
 await test("Multiple appliances are totalled", () => closeTo(calculateHomeEnergy({ ...base, appliances: [...base.appliances, { name: "Lamp", watts: "10", quantity: "2", hoursPerDay: "5", daysPerMonth: "30" }] }).monthlyKwh, 15));
 await test("Fixed monthly charge is included", () => closeTo(calculateHomeEnergy({ ...base, fixedMonthlyCost: "7" }).monthlyCost, 10));
+await test("Energy IVA is included", () => closeTo(calculateHomeEnergy({ ...base, energyIvaRate: "23" }).monthlyCost, 3.69));
+await test("Energy IVA amount is reported separately", () => closeTo(calculateHomeEnergy({ ...base, energyIvaRate: "23" }).monthlyEnergyIva, 0.69));
 await test("Contracted power daily price is included", () => closeTo(calculateHomeEnergy({ ...base, contractedPowerPricePerDay: "0.30", billingDays: "30" }).monthlyCost, 12));
+await test("Contracted power IVA is included", () => closeTo(calculateHomeEnergy({ ...base, contractedPowerPricePerDay: "0.30", contractedPowerIvaRate: "6", billingDays: "30" }).monthlyCost, 12.54));
+await test("Contracted power IVA amount is reported separately", () => closeTo(calculateHomeEnergy({ ...base, contractedPowerPricePerDay: "0.30", contractedPowerIvaRate: "6", billingDays: "30" }).monthlyPowerIva, 0.54));
 await test("Contracted power charge uses billing days", () => closeTo(calculateHomeEnergy({ ...base, contractedPowerPricePerDay: "0.30", billingDays: "31" }).monthlyPowerCost, 9.3));
 await test("Daily averages use billing days", () => closeTo(calculateHomeEnergy({ ...base, contractedPowerPricePerDay: "0.30", billingDays: "30" }).dailyCost, 0.4));
 await test("Annual contracted power uses 365 days", () => closeTo(calculateHomeEnergy({ ...base, contractedPowerPricePerDay: "0.30", billingDays: "30" }).annualCost, 145.5));
+await test("Annual contracted power includes IVA", () => closeTo(calculateHomeEnergy({ ...base, contractedPowerPricePerDay: "0.30", contractedPowerIvaRate: "6", billingDays: "30" }).annualPowerCost, 116.07));
+await test("IVA over 100 percent is rejected", () => { try { calculateHomeEnergy({ ...base, energyIvaRate: "101" }); } catch (error) { assert(error instanceof ValidationError); return; } throw new Error("Expected validation error"); });
 await test("Zero billing days is rejected", () => { try { calculateHomeEnergy({ ...base, billingDays: "0" }); } catch (error) { assert(error instanceof ValidationError); return; } throw new Error("Expected validation error"); });
 await test("Annual result is twelve months", () => closeTo(calculateHomeEnergy(base).annualCost, 36));
 await test("Decimal comma is accepted", () => closeTo(calculateHomeEnergy({ ...base, pricePerKwh: "0,25" }).monthlyCost, 3));

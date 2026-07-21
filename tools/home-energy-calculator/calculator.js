@@ -1,4 +1,4 @@
-import { ValidationError, calculateHomeEnergy, formatCurrency, formatNumber, sanitiseDecimalInput, sanitiseIntegerInput } from "./calculations.js?v=4";
+import { ValidationError, calculateHomeEnergy, formatCurrency, formatNumber, sanitiseDecimalInput, sanitiseIntegerInput } from "./calculations.js?v=5";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -65,7 +65,9 @@ function readAppliances() {
 function readInput() {
   return {
     pricePerKwh: $("#price-per-kwh").value,
+    energyIvaRate: $("#energy-iva").value,
     contractedPowerPricePerDay: $("#contracted-power-price").value,
+    contractedPowerIvaRate: $("#contracted-power-iva").value,
     billingDays: $("#billing-days").value,
     fixedMonthlyCost: $("#fixed-monthly-cost").value,
     appliances: readAppliances(),
@@ -86,7 +88,9 @@ function loadDraft() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (!saved || !Array.isArray(saved.appliances)) return false;
     $("#price-per-kwh").value = saved.pricePerKwh ?? "0.25";
+    $("#energy-iva").value = saved.energyIvaRate ?? "0";
     $("#contracted-power-price").value = saved.contractedPowerPricePerDay ?? "0";
+    $("#contracted-power-iva").value = saved.contractedPowerIvaRate ?? "0";
     $("#billing-days").value = saved.billingDays ?? "30";
     $("#fixed-monthly-cost").value = saved.fixedMonthlyCost ?? "0";
     saved.appliances.forEach(addAppliance);
@@ -127,8 +131,10 @@ function renderResult(result) {
   $("#daily-cost").textContent = formatCurrency(result.dailyCost);
   $("#annual-cost").textContent = formatCurrency(result.annualCost);
   $("#annual-kwh").textContent = `${formatNumber(result.annualKwh)} kWh`;
-  $("#energy-charge").textContent = formatCurrency(result.monthlyEnergyCost);
-  $("#power-charge").textContent = formatCurrency(result.monthlyPowerCost);
+  $("#energy-charge").textContent = formatCurrency(result.monthlyEnergySubtotal);
+  $("#energy-iva-charge").textContent = formatCurrency(result.monthlyEnergyIva);
+  $("#power-charge").textContent = formatCurrency(result.monthlyPowerSubtotal);
+  $("#power-iva-charge").textContent = formatCurrency(result.monthlyPowerIva);
   $("#fixed-charge").textContent = formatCurrency(result.fixedMonthlyCost);
   $("#daily-kwh").textContent = `${formatNumber(result.dailyKwh)} kWh`;
 
@@ -149,8 +155,10 @@ function resetResults() {
     dailyCost: 0,
     annualCost: 0,
     annualKwh: 0,
-    monthlyEnergyCost: 0,
-    monthlyPowerCost: 0,
+    monthlyEnergySubtotal: 0,
+    monthlyEnergyIva: 0,
+    monthlyPowerSubtotal: 0,
+    monthlyPowerIva: 0,
     fixedMonthlyCost: 0,
     dailyKwh: 0,
     items: [],
@@ -188,7 +196,9 @@ function bindEvents() {
   });
   $("#reset-calculator").addEventListener("click", () => {
     $("#price-per-kwh").value = "0.25";
+    $("#energy-iva").value = "0";
     $("#contracted-power-price").value = "0";
+    $("#contracted-power-iva").value = "0";
     $("#billing-days").value = "30";
     $("#fixed-monthly-cost").value = "0";
     $("#appliance-list").replaceChildren();

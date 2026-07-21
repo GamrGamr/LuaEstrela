@@ -61,6 +61,7 @@ input[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 3px 
 .unit-input input { padding-right: 54px; font-variant-numeric: tabular-nums; }
 .unit-input #price-per-kwh { padding-right: 76px; }
 .unit-input #contracted-power-price { padding-right: 72px; }
+.unit-input #energy-iva, .unit-input #contracted-power-iva { padding-right: 36px; }
 .unit-input #billing-days { padding-right: 52px; }
 .unit-input .appliance-watts, .unit-input .appliance-hours { padding-right: 36px; }
 .unit-input .appliance-days { padding-right: 52px; }
@@ -111,6 +112,8 @@ input[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 3px 
 .result-breakdown div { display: flex; justify-content: space-between; gap: 15px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.1); }
 .result-breakdown dt { color: #b8cfd4; font-size: 12px; }
 .result-breakdown dd { margin: 0; font-size: 12px; font-weight: 850; }
+.result-breakdown .tax-line { padding-left: 12px; }
+.result-breakdown .tax-line dt { color: #91e2d8; }
 .usage-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 25px; }
 .usage-heading h3 { margin: 0; font: 500 24px/1.1 Georgia, serif; }
 .usage-heading span { color: #b8cfd4; font-size: 10px; }

@@ -7,8 +7,8 @@
     <meta name="theme-color" content="#063852" />
     <title>Home Energy Calculator &mdash; EstrelaLuaApps</title>
     <link rel="icon" href="../../assets/favicon-32.ico" sizes="32x32" />
-    <link rel="stylesheet" href="calculator.css?v=5" />
-    <script type="module" src="calculator.js?v=5"></script>
+    <link rel="stylesheet" href="calculator.css?v=6" />
+    <script type="module" src="calculator.js?v=6"></script>
   </head>
   <body>
     <a class="skip-link" href="#calculator-main">Skip to calculator</a>
@@ -55,6 +55,16 @@
                 <div class="unit-input"><input id="contracted-power-price" inputmode="decimal" autocomplete="off" value="0" /><span>EUR/day</span></div>
                 <p class="field-help">Enter the daily contracted-power price shown on your bill.</p>
               </div>
+              <div class="field iva-field">
+                <label for="energy-iva">Energy IVA <span>Optional</span></label>
+                <div class="unit-input"><input id="energy-iva" inputmode="decimal" autocomplete="off" value="0" /><span>%</span></div>
+                <p class="field-help">Enter the IVA rate from your bill, or leave 0 if the energy price already includes IVA.</p>
+              </div>
+              <div class="field iva-field">
+                <label for="contracted-power-iva">Contracted power IVA <span>Optional</span></label>
+                <div class="unit-input"><input id="contracted-power-iva" inputmode="decimal" autocomplete="off" value="0" /><span>%</span></div>
+                <p class="field-help">Enter the IVA rate from your bill, or leave 0 if the power price already includes IVA.</p>
+              </div>
               <div class="field">
                 <label for="billing-days">Billing days</label>
                 <div class="unit-input"><input id="billing-days" inputmode="numeric" autocomplete="off" value="30" /><span>days</span></div>
@@ -95,7 +105,7 @@
         <aside id="results" class="results-card" aria-labelledby="results-title" aria-live="polite">
           <p class="results-kicker">Estimated household total</p>
           <h2 id="results-title">Monthly cost</h2>
-          <div class="monthly-total"><strong id="monthly-cost">&euro;0.00</strong><span>including power and fixed charges</span></div>
+          <div class="monthly-total"><strong id="monthly-cost">&euro;0.00</strong><span>including IVA, power, and fixed charges</span></div>
           <div class="result-highlights">
             <div><span>Monthly use</span><strong id="monthly-kwh">0 kWh</strong></div>
             <div><span>Average daily cost</span><strong id="daily-cost">&euro;0.00</strong></div>
@@ -104,13 +114,15 @@
           </div>
           <dl class="result-breakdown">
             <div><dt>Energy charge</dt><dd id="energy-charge">&euro;0.00</dd></div>
+            <div class="tax-line"><dt>Energy IVA</dt><dd id="energy-iva-charge">&euro;0.00</dd></div>
             <div><dt>Contracted power</dt><dd id="power-charge">&euro;0.00</dd></div>
+            <div class="tax-line"><dt>Contracted power IVA</dt><dd id="power-iva-charge">&euro;0.00</dd></div>
             <div><dt>Other fixed charges</dt><dd id="fixed-charge">&euro;0.00</dd></div>
             <div><dt>Average daily use</dt><dd id="daily-kwh">0 kWh</dd></div>
           </dl>
           <div class="usage-heading"><h3>Biggest energy users</h3><span>per month</span></div>
           <ol id="usage-list" class="usage-list"><li class="empty-result">Add an appliance to see its share.</li></ol>
-          <p class="estimate-note">These results are based on the energy usage and prices you enter. Your electricity bill may also include taxes, fees, tariff periods, and changing prices.</p>
+          <p class="estimate-note">These results use the IVA rates and prices you enter. Your electricity bill may also include other taxes, fees, tariff periods, and changing prices.</p>
         </aside>
       </div>
 
