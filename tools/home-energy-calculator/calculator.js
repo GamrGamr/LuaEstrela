@@ -2,7 +2,7 @@ import { ValidationError, calculateHomeEnergy, formatCurrency, formatNumber, san
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-const STORAGE_KEY = "estrelalua-home-energy-v2";
+const STORAGE_KEY = "estrelalua-home-energy-v3";
 let nextRowId = 1;
 let calculateTimer = 0;
 
@@ -110,11 +110,11 @@ function loadDraft() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (!saved || !Array.isArray(saved.appliances)) return false;
-    $("#price-per-kwh").value = saved.pricePerKwh ?? "0.25";
+    $("#price-per-kwh").value = saved.pricePerKwh ?? "0";
     $("#energy-iva").value = saved.energyIvaRate ?? "0";
     $("#contracted-power-price").value = saved.contractedPowerPricePerDay ?? "0";
     $("#contracted-power-iva").value = saved.contractedPowerIvaRate ?? "0";
-    $("#billing-days").value = saved.billingDays ?? "30";
+    $("#billing-days").value = saved.billingDays ?? "0";
     $("#fixed-monthly-cost").value = saved.fixedMonthlyCost ?? "0";
     saved.appliances.forEach(addAppliance);
     return true;
